@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+/* ===============================
+   Theme tokens (Tailwind v4 @theme)
+   =============================== */
+@theme {
+    /* Brand (blue) */
+    --color-primary-50:#eff6ff; --color-primary-100:#dbeafe; --color-primary-200:#bfdbfe;
+    --color-primary-300:#93c5fd; --color-primary-400:#60a5fa; --color-primary-500:#3b82f6;
+    --color-primary-600:#2563eb; --color-primary-700:#1d4ed8; --color-primary-800:#1e40af;
+    --color-primary-900:#1e3a8a; --color-primary-950:#172554;
+
+    /* Neutrals */
+    --color-neutral-50:#fafafa; --color-neutral-100:#f5f5f5; --color-neutral-200:#e5e5e5;
+    --color-neutral-300:#d4d4d4; --color-neutral-400:#a3a3a3; --color-neutral-500:#737373;
+    --color-neutral-600:#525252; --color-neutral-700:#404040; --color-neutral-800:#262626;
+    --color-neutral-900:#171717; --color-neutral-950:#0a0a0a;
+
+    /* App surfaces (dark defaults) */
+    --bg: var(--color-neutral-950);
+    --bg-center: oklch(24% 0.03 260);
+
+    /* Theme-aware text */
+    --text: rgb(229 231 235);
+    --text-muted: color-mix(in oklab, var(--text) 72%, var(--bg));
+    --text-subtle: color-mix(in oklab, var(--text) 58%, var(--bg));
+
+    /* Glass & panel */
+    --glass: color-mix(in oklab, var(--color-neutral-950) 65%, transparent);
+    --panel: color-mix(in oklab, var(--color-neutral-950) 90%, transparent);
+    --panel-border: color-mix(in oklab, white 10%, transparent);
+
+    /* Accent (emerald vibe for chips/icons) */
+    --accent: #10b981; /* emerald-500 */
+}
+
+/* Light overrides (flip via <html class="dark"> from Nuxt Color Mode) */
+:root { color-scheme: light dark; }
+:root:not(.dark) {
+    --bg:#f7f7f8;
+    --bg-center:#ffffff;
+
+    --text:#0b1020;
+    --text-muted: color-mix(in oklab, var(--text) 72%, var(--bg));
+    --text-subtle: color-mix(in oklab, var(--text) 58%, var(--bg));
+
+    --glass: color-mix(in oklab, white 70%, transparent);
+    --panel: color-mix(in oklab, black 4%, white 96%);
+    --panel-border: color-mix(in oklab, black 8%, transparent);
+
+    /* accent can be the same; tweak if you want a different light-mode tint */
+    --accent: #10b981;
+}
+
+/* ===============================
+   Base
+   =============================== */
+@layer base {
+    html, body, #__nuxt { height: 100%; }
+
+    body {
+        background:
+                radial-gradient(1200px 700px at 50% -10%, var(--bg-center) 0%, transparent 55%),
+                radial-gradient(800px 500px at 110% 10%, rgba(16,185,129,.08) 0%, transparent 60%),
+                radial-gradient(800px 500px at -10% 20%, rgba(59,130,246,.06) 0%, transparent 60%),
+                var(--bg);
+        color: var(--text);
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    code, pre {
+        font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+        Consolas, "Liberation Mono", monospace;
+    }
+}
+
+/* ===============================
+   Utilities (standard selectors)
+   =============================== */
+@layer utilities {
+    /* Layout container */
+    .container-app { @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8; }
+
+    /* Panel + soft shadow */
+    .panel {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        @apply rounded-xl;
+    }
+    .shadow-soft {
+        box-shadow:
+                0 1px 0 0 rgba(255,255,255,.03) inset,
+                0 6px 18px rgba(0,0,0,.25);
+    }
+
+    /* Theme-aware text helpers */
+    .text-fg        { color: var(--text); }
+    .text-fg-muted  { color: var(--text-muted); }
+    .text-fg-subtle { color: var(--text-subtle); }
+
+    /* Accent helpers (emerald “feel” without forcing body text color) */
+    .text-accent { color: var(--accent); }
+    .chip-accent {
+        background: color-mix(in oklab, var(--accent) 12%, transparent);
+        border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent);
+    }
+    .chip-accent:hover {
+        background: color-mix(in oklab, var(--accent) 18%, transparent);
+        transform: translateY(-0.5px);
+    }
+    .badge-accent {
+        background: color-mix(in oklab, var(--accent) 16%, transparent);
+        border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+    }
+
+    /* Motion & niceties */
+    .chat-message-enter-active,
+    .chat-message-leave-active { transition: all .18s ease; }
+    .chat-message-enter-from,
+    .chat-message-leave-to { opacity: 0; transform: translateY(6px); }
+
+    button,[role="button"]{
+        transition: background-color .15s, border-color .15s, color .15s,
+        box-shadow .15s, transform .15s cubic-bezier(.2,.7,.3,1);
+    }
+    button:hover { transform: translateY(-0.5px); }
+
+    /* Scrollbar (webkit) */
+    *::-webkit-scrollbar { height: 10px; width: 10px; }
+    *::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,.18);
+        border-radius: 999px; border: 2px solid transparent; background-clip: content-box;
+    }
+    :root:not(.dark) *::-webkit-scrollbar-thumb { background: rgba(0,0,0,.22); }
+}

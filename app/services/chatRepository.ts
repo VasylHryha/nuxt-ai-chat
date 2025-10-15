@@ -1,88 +1,130 @@
-import type { Session } from '~/types'
-import { $fetch } from 'ofetch' // Nuxt's $fetch (ofetch) explicitly imported
+import type { ChatMessage, DirectorySnapshot, Profile, Session } from '~/types'
+// app/services/chatRepository.ts
+import { $fetch } from 'ofetch'
 
-const SESSIONS_KEY = 'ai-chat.v1.sessions'
-const CURRENT_KEY = 'ai-chat.v1.current'
+const STORAGE_KEY = 'ai-chat.v1.directory'
 
-function isBrowser(): boolean {
-  return typeof window !== 'undefined' && typeof localStorage !== 'undefined'
+const isBrowser = () => typeof window !== 'undefined' && typeof localStorage !== 'undefined'
+const now = () => Date.now()
+
+// ——— Merge helpers ———
+function mergeMessages(local: ChatMessage[], remote: ChatMessage[]): ChatMessage[] {
+  const byId = new Map<string, ChatMessage>()
+  for (const m of local) byId.set(m.id, m)
+  for (const r of remote) {
+    const l = byId.get(r.id)
+    if (!l || r.updatedAt > l.updatedAt)
+      byId.set(r.id, r)
+  }
+  return Array.from(byId.values()).sort((a, b) => a.createdAt - b.createdAt)
 }
 
-interface LoadResult { sessions: Record<string, Session>, currentSessionId: string }
+function mergeSessions(local: Record<string, Session>, remote: Record<string, Session>): Record<string, Session> {
+  const out: Record<string, Session> = { ...local }
+  for (const [id, r] of Object.entries(remote)) {
+    const l = out[id]
+    if (!l) { out[id] = r; continue }
+    // last-write-wins at session level; also merge messages
+    const mergedMsgs = mergeMessages(l.messages, r.messages)
+    const newer = (r.updatedAt > l.updatedAt) ? r : l
+    out[id] = { ...newer, messages: mergedMsgs }
+  }
+  return out
+}
 
-/**
- * Single repository:
- * 1) Try localStorage (browser).
- * 2) If empty or not available, try API fallback (optional, future-ready).
- * 3) Always return a safe shape.
- */
+function mergeProfiles(local: Record<string, Profile>, remote: Record<string, Profile>): Record<string, Profile> {
+  const out: Record<string, Profile> = { ...local }
+  for (const [id, rp] of Object.entries(remote)) {
+    const lp = out[id]
+    if (!lp) { out[id] = rp; continue }
+    const sessions = mergeSessions(lp.sessions, rp.sessions)
+    const newer = (rp.updatedAt > lp.updatedAt) ? rp : lp
+    out[id] = { ...newer, sessions }
+    // if currentSessionId disappeared, clear it
+    if (!out[id].sessions[out[id].currentSessionId])
+      out[id].currentSessionId = ''
+  }
+  return out
+}
+
+function mergeSnapshots(local: DirectorySnapshot, remote: DirectorySnapshot): DirectorySnapshot {
+  const profiles = mergeProfiles(local.profiles || {}, remote.profiles || {})
+  // prefer whichever snapshot is newer via max updated profile
+  const localMax = Math.max(0, ...Object.values(local.profiles || {}).map(p => p.updatedAt))
+  const remoteMax = Math.max(0, ...Object.values(remote.profiles || {}).map(p => p.updatedAt))
+  const currentProfileId = remoteMax >= localMax ? remote.currentProfileId || local.currentProfileId : local.currentProfileId
+  return { currentProfileId, profiles }
+}
+
+// ——— Repository ———
+let pushTimer: any = null
+let syncTimer: any = null
+
 export const chatRepository = {
-  async load(): Promise<LoadResult> {
-    // 1) Browser localStorage
+  async load(): Promise<DirectorySnapshot> {
+    // 1) Local first
     if (isBrowser()) {
       try {
-        const sessions = JSON.parse(localStorage.getItem(SESSIONS_KEY) || '{}') || {}
-        const currentSessionId = localStorage.getItem(CURRENT_KEY) || ''
-
-        // If we have something, use it immediately.
-        if (Object.keys(sessions).length > 0 && currentSessionId) {
-          return { sessions, currentSessionId }
-        }
+        const raw = localStorage.getItem(STORAGE_KEY)
+        if (raw)
+          return JSON.parse(raw) as DirectorySnapshot
       }
-      catch {
-        // corrupted localStorage → fall through to API
-      }
+      catch {}
     }
-
-    // 2) API fallback (optional; works in both SSR and client)
+    // 2) Remote fallback
     try {
-      // shape is up to your future API; we expect the same as localStorage
-      const result = await $fetch<LoadResult>('/api/v1/chats', { method: 'GET' })
-      if (result && typeof result === 'object') {
-        // If we’re in the browser, also cache to localStorage for next time
-        if (isBrowser()) {
-          localStorage.setItem(SESSIONS_KEY, JSON.stringify(result.sessions || {}))
-          localStorage.setItem(CURRENT_KEY, result.currentSessionId || '')
-        }
-        return {
-          sessions: result.sessions || {},
-          currentSessionId: result.currentSessionId || '',
-        }
-      }
+      const remote = await $fetch<DirectorySnapshot>('/api/v1/chats', { method: 'GET' })
+      if (isBrowser())
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(remote || { currentProfileId: '', profiles: {} }))
+      return remote || { currentProfileId: '', profiles: {} }
     }
     catch {
-      // No API yet or offline — ignore
+      return { currentProfileId: '', profiles: {} }
     }
-
-    // 3) Safe default
-    return { sessions: {}, currentSessionId: '' }
   },
 
-  /**
-   * Save to localStorage, then try to notify the API (best-effort).
-   * This means the app works offline and syncs when possible.
-   */
-  async save(sessions: Record<string, Session>, currentSessionId: string): Promise<void> {
-    // 1) Local cache
+  async save(snapshot: DirectorySnapshot) {
+    // Local cache
     if (isBrowser()) {
-      try {
-        localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
-        localStorage.setItem(CURRENT_KEY, currentSessionId)
-      }
-      catch {
-        // quota or private mode — ignore, still try API
-      }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot)) }
+      catch {}
     }
+    // Debounced push
+    if (pushTimer)
+      clearTimeout(pushTimer)
+    pushTimer = setTimeout(async () => {
+      try { await $fetch('/api/v1/chats', { method: 'PUT', body: snapshot }) }
+      catch {}
+    }, 600) // debounce 600ms
+  },
 
-    // 2) Best-effort API sync (if/when you implement it)
+  async syncPull(local: DirectorySnapshot): Promise<DirectorySnapshot> {
     try {
-      await $fetch('/api/v1/chats', {
-        method: 'PUT',
-        body: { sessions, currentSessionId },
-      })
+      const remote = await $fetch<DirectorySnapshot>('/api/v1/chats', { method: 'GET' })
+      const merged = mergeSnapshots(local, remote || { currentProfileId: '', profiles: {} })
+      // If merged differs, persist
+      await this.save(merged)
+      return merged
     }
     catch {
-      // API not implemented or offline — ignore
+      return local
     }
   },
+
+  startBackgroundSync(getLocal: () => DirectorySnapshot, setLocal: (snap: DirectorySnapshot) => void, intervalMs = 60_000) {
+    if (syncTimer)
+      clearInterval(syncTimer)
+    syncTimer = setInterval(async () => {
+      const merged = await this.syncPull(getLocal())
+      setLocal(merged) // reflect merges into the store
+    }, intervalMs)
+  },
+
+  stopBackgroundSync() {
+    if (syncTimer)
+      clearInterval(syncTimer)
+    syncTimer = null
+  },
+
+  now,
 }

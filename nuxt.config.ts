@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import { defineNuxtConfig } from 'nuxt/config'
 
@@ -18,6 +19,10 @@ export default defineNuxtConfig({
     classSuffix: '', // -> <html class="dark"> / <html>
     preference: 'dark',
     fallback: 'dark',
+  },
+  alias: {
+    'db': fileURLToPath(new URL('./db', import.meta.url)),
+    '@/server': fileURLToPath(new URL('./server', import.meta.url)),
   },
 
   // Tailwind v4 via Vite plugin (no postcss config needed)
@@ -54,9 +59,12 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     openrouterApiKey: '',
+    openaiApiKey: '',
     public: {
       openrouterBase: 'https://openrouter.ai/api/v1',
       openrouterModel: 'deepseek/deepseek-r1:free',
+      openaiBase: 'https://api.openai.com/v1',
+      openaiModel: 'gpt-5-nano',
       appTitle: 'Nuxt Chat',
       defaultProvider: 'nuxt',
     },

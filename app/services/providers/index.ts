@@ -1,16 +1,19 @@
-import type { ChatProvider } from './types'
-import { nuxtProvider } from './nuxt'
-import { openrouterProvider } from './openrouter'
+// app/services/providers/index.ts
+import type { ProviderAdapter, ProviderKey } from './types'
+import { anthropicProvider } from './anthropic'
+import { geminiProvider } from './gemini'
+import { nuxtProvider } from './nuxt' // facade to /api/v1/chat
 
-const registry: Record<string, () => ChatProvider> = {
-  nuxt: nuxtProvider,
-  openrouter: openrouterProvider,
-  // add more later (openai, deepseek, etc.)
+const registry: Record<ProviderKey, () => ProviderAdapter> = {
+  openrouter: () => nuxtProvider('openrouter'), // send only, no directory
+  openai: () => nuxtProvider('openai'), // send + directory
+  anthropic: () => anthropicProvider(), // send only (for now)
+  gemini: () => geminiProvider(), // send only (for now)
 }
 
-export function getProvider(name: string = 'nuxt'): ChatProvider {
-  const factory = registry[name]
-  if (!factory)
-    throw new Error(`Unknown provider: ${name}`)
-  return factory()
+export function getAdapter(key: ProviderKey): ProviderAdapter {
+  const f = registry[key]; if (!f)
+    throw new Error(`Unknown provider: ${key}`)
+  return f()
 }
+export const getProvider = (key: ProviderKey) => getAdapter(key).chat

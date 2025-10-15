@@ -1,46 +1,46 @@
-// server/api/v1/openrouter/chat.post.ts
 import { defineEventHandler, readBody } from 'h3'
 
 export default defineEventHandler(async (event) => {
   const { messages, model, temperature = 0.7 } = await readBody(event)
   const {
     openrouterApiKey,
-    public: { openrouterBase = 'https://openrouter.ai/api/v1', defaultModel = 'deepseek/deepseek-r1' },
+    public: { openrouterBase = 'https://openrouter.ai/api/v1' },
   } = useRuntimeConfig()
 
   if (!openrouterApiKey) {
-    throw createError({ statusCode: 500, statusMessage: 'OPENROUTER_API_KEY missing' })
+    throw createError({ statusCode: 500, statusMessage: 'OPENROUTER_API_KEY is not configured' })
+  }
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw createError({ statusCode: 400, statusMessage: 'messages[] required' })
   }
 
-  const r = await fetch(`${openrouterBase}/chat/completions`, {
+  const usedModel = model || 'deepseek/deepseek-r1'
+
+  const res = await fetch(`${openrouterBase}/chat/completions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${openrouterApiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://your-app.example',
-      'X-Title': 'Nuxt Chat',
     },
     body: JSON.stringify({
-      model: model || defaultModel,
+      model: usedModel,
       temperature,
       messages,
+      // Optional: surface "reasoning" if model supports it
+      reasoning: { effort: 'medium' },
     }),
   })
 
-  if (!r.ok) {
-    const t = await r.text().catch(() => '')
-    throw createError({ statusCode: r.status, statusMessage: t || 'Provider error' })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw createError({ statusCode: res.status, statusMessage: text || 'OpenRouter error' })
   }
 
-  const data = await r.json()
-  const choice = data?.choices?.[0]
-  const content = choice?.message?.content || ''
-  const reasoning = choice?.message?.reasoning || data?.reasoning || undefined
+  const data = await res.json()
+  const msg = data?.choices?.[0]?.message
+  const content = msg?.content ?? ''
+  // Some R1 variants also return reasoning tokens under message.reasoning or top-level
+  const reasoning = msg?.reasoning ?? data?.choices?.[0]?.reasoning ?? undefined
 
-  return {
-    content,
-    reasoning,
-    provider: 'openrouter',
-    model: data?.model || (model || defaultModel),
-  }
+  return { content, reasoning, provider: 'openrouter', model: usedModel }
 })

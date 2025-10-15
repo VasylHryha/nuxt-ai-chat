@@ -1,14 +1,9 @@
-// Provider-local types (kept out of global types to avoid bloat)
+// app/services/providers/types.ts
+export type ProviderKey = 'openrouter' | 'openai' | 'anthropic' | 'gemini'
+
 export type Role = 'system' | 'user' | 'assistant'
-
 export interface ChatTurn { role: Role, content: string }
-
-export interface ChatResponse {
-  content: string
-  reasoning?: string
-  provider?: string
-  model?: string
-}
+export interface ChatResponse { content: string, reasoning?: string, provider?: string, model?: string }
 
 export interface ProviderSendInput {
   sessionId: string
@@ -19,9 +14,17 @@ export interface ProviderSendInput {
   signal?: AbortSignal
 }
 
-export interface ChatProvider {
-  name: string
-  send: (input: ProviderSendInput) => Promise<ChatResponse>
+export interface ChatPort { send: (input: ProviderSendInput) => Promise<ChatResponse> }
+
+export interface DirectoryPort {
+  getList: (userId?: string) => Promise<any> // or DirectorySnapshot
+  getChat: (sessionIdOrSlug: string) => Promise<any>
+  upsertSnapshot: (snapshot: any) => Promise<void>
 }
 
-export type ProviderKey = 'nuxt' | 'openrouter' | 'openai' | 'deepseek'
+export interface ProviderAdapter {
+  key: ProviderKey
+  supportsServerChats: boolean
+  chat: ChatPort
+  directory?: DirectoryPort // present only if supportsServerChats = true
+}

@@ -1,19 +1,28 @@
-import type { ChatProvider, ChatResponse, ProviderSendInput } from './types'
+// app/services/providers/nuxt.ts  (also used for openai via facade)
+import type { ChatResponse, ProviderAdapter, ProviderKey, ProviderSendInput } from './types'
 
-export function nuxtProvider(): ChatProvider {
+const toS = (v: unknown) => typeof v === 'string' ? v : (v == null ? '' : String(v))
+
+export function nuxtProvider(kind: Extract<ProviderKey, 'openrouter' | 'openai'>): ProviderAdapter {
   return {
-    name: 'nuxt',
-    async send({ messages, model, temperature, signal }: ProviderSendInput): Promise<ChatResponse> {
-      const result = await $fetch<{ content?: unknown, reasoning?: unknown, provider?: string, model?: string }>(
-        '/api/v1/openrouter/chat',
-        { method: 'POST', body: { messages, model, temperature }, signal },
-      )
-      return {
-        content: typeof result?.content === 'string' ? result.content : String(result?.content ?? ''),
-        reasoning: typeof result?.reasoning === 'string' ? result.reasoning : undefined,
-        provider: result?.provider ?? 'openrouter',
-        model: result?.model,
-      }
+    key: kind,
+    supportsServerChats: kind === 'openai',
+    chat: {
+      async send({ messages, model, temperature, signal }: ProviderSendInput): Promise<ChatResponse> {
+        const r = await $fetch('/api/v1/chat', {
+          method: 'POST',
+          body: { provider: kind, messages, model, temperature },
+          signal,
+        })
+        return { content: toS(r?.content), reasoning: typeof r?.reasoning === 'string' ? r.reasoning : undefined, provider: r?.provider ?? kind, model: r?.model ?? model }
+      },
     },
+    directory: kind === 'openai'
+      ? {
+          getList: (userId?: string) => $fetch(`/api/v1/openai/chats`, { method: 'GET', query: { userId } }),
+          getChat: (id: string) => $fetch(`/api/v1/openai/chats/${id}`, { method: 'GET' }), // you can add this route later
+          upsertSnapshot: (snap: any) => $fetch(`/api/v1/openai/chats`, { method: 'PUT', body: snap }),
+        }
+      : undefined,
   }
 }

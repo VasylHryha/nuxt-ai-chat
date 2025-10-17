@@ -1,5 +1,7 @@
+/* global Bun */
 import { mkdir, readdir } from 'node:fs/promises'
 import path from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 // db/scripts/migrate.js
 import { Database } from 'bun:sqlite'

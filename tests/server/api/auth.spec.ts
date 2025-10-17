@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { createEvent } from 'h3'
 import { createRequest, createResponse } from 'node-mock-http'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -49,16 +50,16 @@ describe('auth API routes', () => {
     })
   })
 
+  beforeEach(() => {
+    const reset = (globalThis as any).__NUXT_RESET_DB__
+    reset?.()
+  })
+
   afterAll(() => {
     if (originalRuntimeConfig)
       (globalThis as any).useRuntimeConfig = originalRuntimeConfig
     else
       delete (globalThis as any).useRuntimeConfig
-  })
-
-  beforeEach(() => {
-    const reset = (globalThis as any).__NUXT_RESET_DB__
-    reset?.()
   })
 
   it('registers a user via signup and sets access cookie', async () => {

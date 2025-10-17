@@ -1,6 +1,7 @@
 import type { Mock } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'

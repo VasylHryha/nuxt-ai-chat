@@ -1,4 +1,5 @@
 import type { Mock } from 'vitest'
+import { Buffer } from 'node:buffer'
 import { createEvent } from 'h3'
 import { createRequest, createResponse } from 'node-mock-http'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -57,17 +58,17 @@ describe('multi-user authorization', () => {
     })
   })
 
+  beforeEach(() => {
+    resetDb?.()
+    fetchMock.mockReset()
+    streamTextMock.mockReset()
+  })
+
   afterAll(() => {
     if (originalRuntimeConfig)
       (globalThis as any).useRuntimeConfig = originalRuntimeConfig
     else
       delete (globalThis as any).useRuntimeConfig
-  })
-
-  beforeEach(() => {
-    resetDb?.()
-    fetchMock.mockReset()
-    streamTextMock.mockReset()
   })
 
   it('prevents one user from listing another user’s chats', async () => {

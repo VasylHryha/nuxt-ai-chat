@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { Database } from 'bun:sqlite'
 

@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { createEvent } from 'h3'
 import { createRequest, createResponse } from 'node-mock-http'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -31,15 +32,15 @@ describe('aPI input validation', () => {
     ;(globalThis as any).useRuntimeConfig = () => ({ jwtSecret: 'test-secret', public: {} })
   })
 
+  beforeEach(() => {
+    resetDb?.()
+  })
+
   afterAll(() => {
     if (originalRuntimeConfig)
       (globalThis as any).useRuntimeConfig = originalRuntimeConfig
     else
       delete (globalThis as any).useRuntimeConfig
-  })
-
-  beforeEach(() => {
-    resetDb?.()
   })
 
   it('rejects signup with invalid email or short password', async () => {

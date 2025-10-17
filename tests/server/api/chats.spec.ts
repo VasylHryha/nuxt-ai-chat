@@ -1,4 +1,5 @@
 import type { Mock } from 'vitest'
+import { Buffer } from 'node:buffer'
 import { createEvent } from 'h3'
 import { createRequest, createResponse } from 'node-mock-http'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -65,18 +66,18 @@ describe('chat API endpoints', () => {
     })
   })
 
-  afterAll(() => {
-    if (originalRuntimeConfig)
-      (globalThis as any).useRuntimeConfig = originalRuntimeConfig
-    else
-      delete (globalThis as any).useRuntimeConfig
-  })
-
   beforeEach(() => {
     resetDb?.()
     fetchMock.mockClear()
     streamTextMock.mockReset()
     getProviderMock.mockClear()
+  })
+
+  afterAll(() => {
+    if (originalRuntimeConfig)
+      (globalThis as any).useRuntimeConfig = originalRuntimeConfig
+    else
+      delete (globalThis as any).useRuntimeConfig
   })
 
   it('lists chats filtered by user email', async () => {

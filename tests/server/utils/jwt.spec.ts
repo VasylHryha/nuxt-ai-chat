@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { describe, expect, it, vi } from 'vitest'
 import { signJWT, verifyJWT } from '@/server/utils/jwt'
 

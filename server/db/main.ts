@@ -1,3 +1,4 @@
+import process from 'node:process'
 import Database from 'better-sqlite3'
 
 const DB_PATH = new URL('../../db/sqlite/app.db', import.meta.url).pathname

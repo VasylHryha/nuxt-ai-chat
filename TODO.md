@@ -315,7 +315,8 @@ const validated = schema.parse(getQuery(event))
 ```typescript
 // Track attempts by IP or email
 const attempts = await storage.getItem(`login:${ip}`)
-if (attempts > 5) throw createError({ statusCode: 429, message: 'Too many attempts' })
+if (attempts > 5)
+  throw createError({ statusCode: 429, message: 'Too many attempts' })
 ```
 
 **Acceptance criteria**:

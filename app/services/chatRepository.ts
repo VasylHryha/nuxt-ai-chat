@@ -23,7 +23,10 @@ function mergeSessions(local: Record<string, Session>, remote: Record<string, Se
   const out: Record<string, Session> = { ...local }
   for (const [id, r] of Object.entries(remote)) {
     const l = out[id]
-    if (!l) { out[id] = r; continue }
+    if (!l) {
+      out[id] = r
+      continue
+    }
     // last-write-wins at session level; also merge messages
     const mergedMsgs = mergeMessages(l.messages, r.messages)
     const newer = (r.updatedAt > l.updatedAt) ? r : l
@@ -36,7 +39,10 @@ function mergeProfiles(local: Record<string, Profile>, remote: Record<string, Pr
   const out: Record<string, Profile> = { ...local }
   for (const [id, rp] of Object.entries(remote)) {
     const lp = out[id]
-    if (!lp) { out[id] = rp; continue }
+    if (!lp) {
+      out[id] = rp
+      continue
+    }
     const sessions = mergeSessions(lp.sessions, rp.sessions)
     const newer = (rp.updatedAt > lp.updatedAt) ? rp : lp
     out[id] = { ...newer, sessions }
@@ -69,7 +75,8 @@ export const chatRepository = {
         if (raw)
           return JSON.parse(raw) as DirectorySnapshot
       }
-      catch {}
+      catch {
+      }
     }
     // 2) Remote fallback
     try {
@@ -86,15 +93,21 @@ export const chatRepository = {
   async save(snapshot: DirectorySnapshot) {
     // Local cache
     if (isBrowser()) {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot)) }
-      catch {}
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
+      }
+      catch {
+      }
     }
     // Debounced push
     if (pushTimer)
       clearTimeout(pushTimer)
     pushTimer = setTimeout(async () => {
-      try { await $fetch('/api/v1/chats', { method: 'PUT', body: snapshot }) }
-      catch {}
+      try {
+        await $fetch('/api/v1/chats', { method: 'PUT', body: snapshot })
+      }
+      catch {
+      }
     }, 600) // debounce 600ms
   },
 

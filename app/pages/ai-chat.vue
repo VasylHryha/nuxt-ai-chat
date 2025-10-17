@@ -16,8 +16,8 @@ function handleSubmit(e: Event) {
     <div v-for="(m, index) in chat.messages" :key="m.id ? m.id : index">
       {{ m.role === "user" ? "User: " : "AI: " }}
       <div
-        v-for="(part, index) in m.parts"
-        :key="`${m.id}-${part.type}-${index}`"
+        v-for="(part, i) in m.parts"
+        :key="`${m.id}-${part.type}-${i}`"
       >
         <div v-if="part.type === 'text'">
           {{ part.text }}

@@ -1,8 +1,8 @@
 import type { Mock } from 'vitest'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { aiOpenAIProvider } from '@/app/services/providers/ai-openai'
-import { openaiNativeProvider } from '@/app/services/providers/openai.native'
 import { createProxyProvider } from '@/app/services/providers/index'
+import { openaiNativeProvider } from '@/app/services/providers/openai.native'
 
 const fetchMock = (globalThis as any).__NUXT_FETCH_MOCK__ as Mock
 

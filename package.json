@@ -2,6 +2,9 @@
   "name": "nuxt-ai-chat",
   "type": "module",
   "private": true,
+  "engines": {
+    "bun": ">=1.1.0"
+  },
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev --dotenv .env.local",
@@ -42,8 +45,5 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^5.4.1"
-  },
-  "engines": {
-    "bun": ">=1.1.0"
   }
 }

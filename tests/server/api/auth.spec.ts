@@ -1,10 +1,10 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createEvent } from 'h3'
 import { createRequest, createResponse } from 'node-mock-http'
-import signupHandler from '@/server/api/v1/auth/signup.post'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import loginHandler from '@/server/api/v1/auth/login.post'
-import meHandler from '@/server/api/v1/auth/me.get'
 import logoutHandler from '@/server/api/v1/auth/logout.post'
+import meHandler from '@/server/api/v1/auth/me.get'
+import signupHandler from '@/server/api/v1/auth/signup.post'
 import { insertUser, listUsers, upsertPasswordCredential } from '@/server/db/users'
 import { hashPassword } from '@/server/utils/password'
 
@@ -38,7 +38,7 @@ function createGetEvent(path: string, headers: Record<string, string> = {}) {
   return createEvent(req, res)
 }
 
-describe('Auth API routes', () => {
+describe('auth API routes', () => {
   let originalRuntimeConfig: any
 
   beforeAll(() => {

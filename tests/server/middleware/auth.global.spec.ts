@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createEvent } from 'h3'
 import { createRequest, createResponse } from 'node-mock-http'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import authMiddleware from '@/server/middleware/auth.global'
 import { signJWT } from '@/server/utils/jwt'
 

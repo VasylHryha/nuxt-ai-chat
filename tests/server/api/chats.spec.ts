@@ -1,13 +1,13 @@
 import type { Mock } from 'vitest'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEvent } from 'h3'
 import { createRequest, createResponse } from 'node-mock-http'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import streamMessagesHandler from '@/server/api/v1/ai/chats/[id]/messages.post'
 import listChatsHandler from '@/server/api/v1/chats/index.get'
 import proxyChatHandler from '@/server/api/v1/chats/index.post'
-import streamMessagesHandler from '@/server/api/v1/ai/chats/[id]/messages.post'
-import { insertUser } from '@/server/db/users'
 import { createChatForUser } from '@/server/db/chats'
 import db from '@/server/db/main'
+import { insertUser } from '@/server/db/users'
 
 const streamTextMock = vi.fn()
 vi.mock('ai', () => ({

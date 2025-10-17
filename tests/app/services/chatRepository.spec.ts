@@ -1,5 +1,5 @@
-import type { DirectorySnapshot } from '~/types'
 import type { Mock } from 'vitest'
+import type { DirectorySnapshot } from '~/types'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fetchMock = (globalThis as any).__NUXT_FETCH_MOCK__ as Mock

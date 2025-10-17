@@ -1,8 +1,8 @@
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createEvent } from 'h3'
 import { createRequest, createResponse } from 'node-mock-http'
-import signupHandler from '@/server/api/v1/auth/signup.post'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import loginHandler from '@/server/api/v1/auth/login.post'
+import signupHandler from '@/server/api/v1/auth/signup.post'
 import proxyChatHandler from '@/server/api/v1/chats/index.post'
 
 const resetDb = (globalThis as any).__NUXT_RESET_DB__ as (() => void) | undefined
@@ -23,7 +23,7 @@ function createPostEvent(path: string, body: unknown) {
   return createEvent(req, res)
 }
 
-describe('API input validation', () => {
+describe('aPI input validation', () => {
   let originalRuntimeConfig: any
 
   beforeAll(() => {
@@ -68,7 +68,7 @@ describe('API input validation', () => {
 
   it('rejects login attempts with invalid email formats', async () => {
     const event = createPostEvent('/api/v1/auth/login', {
-      email: "test@example.com' OR '1'='1",
+      email: 'test@example.com\' OR \'1\'=\'1',
       password: 'irrelevant',
     })
 

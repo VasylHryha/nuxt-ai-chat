@@ -148,7 +148,7 @@ export default defineEventHandler(async (event) => {
   // Call your provider's API
   const response = await fetch('https://api.provider.com/chat', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${myProviderApiKey}` },
+    headers: { Authorization: `Bearer ${myProviderApiKey}` },
     body: JSON.stringify({ messages, model, temperature })
   })
 

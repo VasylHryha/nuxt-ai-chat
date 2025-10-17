@@ -1,9 +1,9 @@
-import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 import type { Mock } from 'vitest'
-import Database from 'better-sqlite3'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import Database from 'better-sqlite3'
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 import { rid } from '../../server/utils/id'
 
 type TestGlobals = typeof globalThis & {

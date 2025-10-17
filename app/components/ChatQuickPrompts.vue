@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{ prompts: string[] }>()
+defineProps<{ prompts: string[] }>()
 const emit = defineEmits<{ (e: 'pick', value: string): void }>()
 </script>
 

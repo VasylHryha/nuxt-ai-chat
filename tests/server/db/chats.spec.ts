@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import db from '@/server/db/main'
 import { createChatForUser, listChatsByUserEmail } from '@/server/db/chats'
+import db from '@/server/db/main'
 import { insertUser } from '@/server/db/users'
 
 const resetDb = (globalThis as any).__NUXT_RESET_DB__ as (() => void) | undefined

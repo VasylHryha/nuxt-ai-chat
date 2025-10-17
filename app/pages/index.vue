@@ -39,7 +39,7 @@ const highlights = [
         <h1 class="text-4xl font-semibold leading-tight text-fg md:text-5xl">
           Build AI chat experiences faster with a Nuxt&nbsp;4 starter.
         </h1>
-        {{ counterTitle }}
+
         <p class="max-w-xl text-base leading-relaxed text-fg-muted md:text-lg">
           This playground demonstrates how to pair Nuxt UI, Tailwind, and a secure OpenRouter proxy to deliver AI chat flows
           without exposing API keys. Explore the DeepSeek demo or adapt the components to plug in another model.
@@ -47,24 +47,35 @@ const highlights = [
 
         <div class="flex flex-wrap items-center gap-4">
           <UButton
-            to="/deep-seek"
+            to="/ai-chat"
             color="emerald"
             size="lg"
             class="rounded-xl shadow-lg shadow-emerald-500/20"
           >
-            Open DeepSeek Chat
+            Start Chatting
           </UButton>
 
           <UButton
-            to="https://github.com/your-org/nuxt-ai-chat"
+            to="/users"
+            variant="ghost"
+            size="lg"
+            color="neutral"
+            class="rounded-xl"
+          >
+            Manage Users
+          </UButton>
+
+          <UButton
+            to="https://github.com/anthropics/claude-code"
             target="_blank"
             rel="noreferrer"
             variant="ghost"
             size="lg"
             color="neutral"
             class="rounded-xl"
+            icon="i-heroicons-arrow-top-right-on-square-20-solid"
           >
-            View Repository
+            Docs
           </UButton>
         </div>
       </div>

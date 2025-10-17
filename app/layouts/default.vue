@@ -5,16 +5,24 @@ const year = new Date().getFullYear()
 
 const items = ref<NavigationMenuItem[]>([
   {
-    label: 'DeepSeek via OpenRouter',
-    icon: 'i-heroicons-sparkles-20-solid',
-    to: '/deep-seek',
+    label: 'Home',
+    icon: 'i-heroicons-home-20-solid',
+    to: '/',
   },
   {
-    label: 'OpenRouter',
-    icon: 'i-heroicons-arrow-top-right-on-square-20-solid',
-    to: 'https://openrouter.ai',
-    target: '_blank',
-    rel: 'noopener',
+    label: 'AI Chat',
+    icon: 'i-heroicons-sparkles-20-solid',
+    to: '/ai-chat',
+  },
+  {
+    label: 'Chats',
+    icon: 'i-heroicons-chat-bubble-left-right-20-solid',
+    to: '/chats',
+  },
+  {
+    label: 'Users',
+    icon: 'i-heroicons-users-20-solid',
+    to: '/users',
   },
 ])
 </script>
@@ -30,14 +38,14 @@ const items = ref<NavigationMenuItem[]>([
         </div>
 
         <!-- Brand -->
-        <div class="flex min-w-0 flex-col">
+        <NuxtLink to="/" class="flex min-w-0 flex-col hover:opacity-80 transition-opacity">
           <h1 class="text-base font-semibold tracking-wide leading-none text-fg">
             Nuxt AI Chat
           </h1>
           <p class="text-xs text-fg-subtle truncate">
-            OpenRouter / DeepSeek demo
+            Multi-Provider AI Starter
           </p>
-        </div>
+        </NuxtLink>
 
         <!-- Right side -->
         <div class="ms-auto flex items-center gap-2">

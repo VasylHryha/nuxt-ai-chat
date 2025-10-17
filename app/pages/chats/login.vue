@@ -8,7 +8,7 @@
  */
 
 import { useRoute, useRouter } from '#imports'
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useAuth } from '@/stores/auth' // see store stub below
 
 // Local state (UI only)
@@ -20,9 +20,6 @@ const errorMessage = ref('')
 const auth = useAuth()
 const router = useRouter()
 const route = useRoute()
-
-// Derived state
-const isLoggedIn = computed(() => Boolean(auth.user))
 
 // Very small email validation (client-side convenience)
 const emailRe = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/

@@ -20,8 +20,8 @@ export default defineEventHandler((event) => {
       updatedAt: new Date(r.updated_at).toISOString(),
     }))
   }
-  catch (e: any) {
-    const msg = String(e?.message || 'Failed to list chats')
+  catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Failed to list chats'
     const code = msg.includes('User not found') ? 404 : 400
     throw createError({ statusCode: code, statusMessage: msg })
   }

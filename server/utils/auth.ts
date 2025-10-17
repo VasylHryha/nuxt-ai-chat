@@ -1,5 +1,7 @@
 // server/utils/auth.ts
 import type { H3Event } from 'h3'
+import { deleteCookie, getCookie, getHeader, setCookie } from 'h3'
+import { verifyJWT } from './jwt'
 
 const ACCESS_COOKIE = 'access_token'
 

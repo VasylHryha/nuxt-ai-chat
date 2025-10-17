@@ -53,7 +53,8 @@ export const useUsersStore = defineStore('users', () => {
       const rows = await repo.list()
       indexUsers(rows ?? [])
     }
-    catch (e: any) {
+    catch (error: unknown) {
+      const e = error as { statusMessage?: string, message?: string }
       errorMessage.value = String(e?.statusMessage || e?.message || 'Failed to load users')
     }
     finally {
@@ -82,7 +83,8 @@ export const useUsersStore = defineStore('users', () => {
       lastFetchedAt.value = Date.now()
       return created
     }
-    catch (e: any) {
+    catch (error: unknown) {
+      const e = error as { statusMessage?: string, message?: string }
       const msg = String(e?.statusMessage || e?.message || 'Failed to add PublicUser')
       errorMessage.value = /unique|exists/i.test(msg) ? 'This email already exists.' : msg
       throw new Error(errorMessage.value)

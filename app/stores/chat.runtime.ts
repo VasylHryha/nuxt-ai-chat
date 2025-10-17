@@ -66,7 +66,8 @@ export const useChatRuntime = defineStore('chat.runtime', () => {
       }
       sessions.pushMessageToCurrent(assistant)
     }
-    catch (e: any) {
+    catch (error: unknown) {
+      const e = error as { name?: string, message?: string }
       if (e?.name !== 'AbortError')
         errorMessage.value = e?.message || 'Failed to send'
     }

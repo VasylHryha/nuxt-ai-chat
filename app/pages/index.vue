@@ -39,7 +39,7 @@ const highlights = [
         <h1 class="text-4xl font-semibold leading-tight text-fg md:text-5xl">
           Build AI chat experiences faster with a Nuxt&nbsp;4 starter.
         </h1>
-
+        {{ counterTitle }}
         <p class="max-w-xl text-base leading-relaxed text-fg-muted md:text-lg">
           This playground demonstrates how to pair Nuxt UI, Tailwind, and a secure OpenRouter proxy to deliver AI chat flows
           without exposing API keys. Explore the DeepSeek demo or adapt the components to plug in another model.

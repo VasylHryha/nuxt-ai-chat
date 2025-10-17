@@ -1,11 +1,12 @@
-import type { ChatMessage, Session } from '~/types'
+import type { ChatMessage, DirectorySnapshot, Profile, Session } from '~/types'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { chatRepository } from '@/services/chatRepository'
 import { appendMessageAndApplyLimits, CHARACTER_LIMIT } from '@/services/limits'
 
 export const useChatSessions = defineStore('chat.sessions', () => {
-  // state
+  // state - store as DirectorySnapshot internally
+  const profileId = ref<string>('default-profile')
   const sessions = ref<Record<string, Session>>({})
   const currentSessionId = ref<string>('')
 
@@ -13,24 +14,48 @@ export const useChatSessions = defineStore('chat.sessions', () => {
   const current = computed<Session | undefined>(() => sessions.value[currentSessionId.value])
   const messages = computed<ChatMessage[]>(() => current.value?.messages || [])
 
+  // helper to build snapshot for persistence
+  function getSnapshot(): DirectorySnapshot {
+    const now = Date.now()
+    const profile: Profile = {
+      id: profileId.value,
+      name: 'Default Profile',
+      currentSessionId: currentSessionId.value,
+      sessions: sessions.value,
+      createdAt: now,
+      updatedAt: now,
+    }
+    return {
+      currentProfileId: profileId.value,
+      profiles: { [profileId.value]: profile },
+    }
+  }
+
   // actions
   async function hydrate() {
-    const { sessions: loaded, currentSessionId: loadedId } = await chatRepository.load()
-    sessions.value = loaded
-    currentSessionId.value = loadedId
+    const snapshot = await chatRepository.load()
+
+    // Extract current profile from snapshot
+    const currentProfile = snapshot.profiles[snapshot.currentProfileId]
+
+    if (currentProfile) {
+      profileId.value = currentProfile.id
+      sessions.value = currentProfile.sessions
+      currentSessionId.value = currentProfile.currentSessionId
+    }
 
     if (!current.value || !currentSessionId.value) {
       createNewSession(
-        'DeepSeek via OpenRouter',
-        'openrouter',
-        'deepseek/deepseek-r1',
-        'Hi! I am the DeepSeek reasoning model proxied through OpenRouter. What can I help you explore?',
+        'AI Chat',
+        'ai-openai',
+        'gpt-4',
+        'Hi! How can I help you today?',
       )
     }
   }
 
   function persist() {
-    chatRepository.save(sessions.value, currentSessionId.value)
+    chatRepository.save(getSnapshot())
   }
 
   function createNewSession(title: string, provider: string, model?: string, greeting?: string) {

@@ -5,6 +5,9 @@ import { defineNuxtConfig } from 'nuxt/config'
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+  nitro: {
+    preset: 'bun', // build for Bun runtime
+  },
 
   modules: [
     '@nuxt/ui',
@@ -60,6 +63,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     openrouterApiKey: '',
     openaiApiKey: '',
+    jwtSecret: '',
     public: {
       openrouterBase: 'https://openrouter.ai/api/v1',
       openrouterModel: 'deepseek/deepseek-r1:free',

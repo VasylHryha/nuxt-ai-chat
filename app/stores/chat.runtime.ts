@@ -51,7 +51,6 @@ export const useChatRuntime = defineStore('chat.runtime', () => {
       // 👇 resolve provider for THIS session via composable
       const { send } = useChatProvider(session.id)
       const response = await send({
-        sessionId: session.id,
         model: session.model,
         temperature: 0.7,
         messages: sessions.messages.map(m => ({ role: m.role, content: m.content })),

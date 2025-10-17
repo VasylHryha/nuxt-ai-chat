@@ -1,10 +1,30 @@
 export type Provider = 'openai' | 'openrouter' | 'anthropic' | 'google' | 'mistral' | 'cohere'
 
-export interface User {
+// db/types.ts — DB row shapes (server-only)
+export interface DbUser {
   id: string
   email: string
+  name: string
   created_at: number
 }
+
+export interface DbCredential {
+  id: string
+  user_id: string
+  kind: 'password' | 'oauth' | 'magic'
+  password_hash?: string | null
+  password_salt?: string | null
+  password_algo?: string | null
+  password_params?: string | null
+  created_at: number
+  updated_at: number
+}
+
+// API-safe shape
+export interface PublicUser extends DbUser {}
+
+// Minimal identity in JWT
+export type AuthUser = Omit<DbUser, 'created_at'>
 
 export interface Connection {
   id: string

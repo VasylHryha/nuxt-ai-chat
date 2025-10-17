@@ -24,43 +24,102 @@
   - `/sdk/chats/*` targets AI SDK streaming, but imports need cleanup before it works.
 - Provider utilities (`server/utils/ai.ts`) wrap `@ai-sdk/*` for streaming support.
 
-## Current Working State (Jan 2025)
-- UI renders, Tailwind + Nuxt UI theming in place, and DeepSeek page wires up Pinia + components.
-- Server OpenRouter proxy (`server/api/v1/openrouter/chat.post.ts`) is complete and ready once called with credentials.
-- SQLite schema, seeds, and list/create chat endpoints are ready for manual use.
+## Current Working State (Updated Jan 2025)
 
-## Known Gaps & TODOs
-1. `app/composables/useChatProvider.ts` is incomplete:
-   - Missing `import { computed } from 'vue'` and `import { useChatSessions } from '@/stores/chat.sessions'`.
-   - Uses `ChatProvider` type that no longer exists; should lean on `ChatPort` from `app/services/providers/types.ts`.
-   - Defaults to provider `'nuxt'`, but registry uses `'openrouter' | 'openai' | ...`; fix fallback to a real key (likely `'openrouter'`).
-2. `app/stores/chat.sessions.ts` expects `{ sessions, currentSessionId }` from `chatRepository.load()`, yet the repository currently returns a `DirectorySnapshot`.
-   - Decide: either simplify repository to local-only session store or re-introduce profile snapshot shape; currently hydration fails silently.
-   - Same mismatch for `chatRepository.save(...)`: Pinia store calls `save(sessions.value, currentSessionId.value)` while implementation expects a single snapshot.
-3. Provider send path: `useChatProvider` ultimately calls `$fetch('/api/v1/chat', ...)` via `nuxtProvider`, but there is no `/api/v1/chat` endpoint. Either:
-   - Add a multiplexer route (preferred) that inspects `{ provider }` and dispatches, or
-   - Update providers to hit the existing `/api/v1/{provider}/chat` endpoints.
-4. `ChatMessage` type (`app/types/index.ts`) marks `updatedAt` as required, yet new messages added in stores omit it. Pick a direction: mark optional or populate `updatedAt`.
-5. `server/api/v1/sdk/chats/[id]/messages.post.ts` imports `db` from `'@/server/utils/main'`, which does not exist. Should import from `@/server/db/main` and possibly reuse helpers.
-6. `/server/api/v1/openai/chats.*` currently stores snapshots in-memory only; decide whether to persist to SQLite or keep as demo data.
-7. Testing: no specs under `tests/` yet. Need at least smoke tests for DeepSeek page and server proxies per repo guidelines.
-8. User management flow is missing end-to-end support:
-   - Ensure the `/api/v1/users` routes let us add a user programmatically; define the request/response contract.
-   - Build UI to choose the active user, including a modal to create one from the app shell.
-9. Chat discovery flow still TBD:
-   - After selecting a user, add a provider/model picker (start with OpenAI SDK + `gpt-5-nano`).
-   - Create a chat list page to inspect previous conversations, spawn a new chat, and open an existing transcript.
+### ✅ Completed & Working
+- **AI SDK Integration**: Full AI SDK implementation with streaming support
+  - `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google` installed
+  - Server-side streaming via `/api/v1/ai/chats/[id]/messages.post.ts`
+  - Dynamic provider selection (openai, anthropic, google)
+  - SSE streaming with `text-delta` events
+- **Authentication System**: Complete JWT-based auth
+  - Login/signup endpoints (`/api/v1/auth/*`)
+  - Argon2 password hashing via `@node-rs/argon2`
+  - httpOnly cookies + Bearer token support
+  - Global auth middleware protecting all `/api/v1/*` routes
+  - Auth stores with login/logout/me actions
+- **Database & Persistence**:
+  - SQLite schema with users, connections, chats, messages tables
+  - Database helpers for CRUD operations
+  - Dual-layer persistence (localStorage + server sync)
+  - Conflict resolution with last-write-wins merge
+  - Background sync every 60s
+- **State Management**:
+  - Auth store (token, user)
+  - Users store (SWR cache with TTL)
+  - Chat sessions store (DirectorySnapshot with profiles)
+  - Chat runtime store (sending state, errors, abort control)
+- **Provider Architecture**:
+  - Client-side providers: `ai-openai`, `openai` (legacy)
+  - Server-side dynamic provider factory
+  - Composable-based provider resolution
+
+### 🔧 Recent Fixes (Applied)
+1. ✅ **Fixed `useChatProvider.ts`**:
+   - Added missing `import { computed } from 'vue'`
+   - Added missing `import { useChatSessions } from '@/stores/chat.sessions'`
+   - Changed default provider from `'nuxt'` to `'ai-openai'` (valid registry key)
+2. ✅ **Fixed `chat.sessions.ts` repository contract**:
+   - Store now properly handles `DirectorySnapshot` structure
+   - `hydrate()` extracts current profile from snapshot
+   - `persist()` builds proper `DirectorySnapshot` with profile wrapper
+   - Added `profileId` state for multi-profile support
+3. ✅ **Fixed `ChatMessage` type consistency**:
+   - `appendMessageAndApplyLimits()` now populates `updatedAt` from `createdAt` if missing
+   - Ensures all messages have required `updatedAt` field
+
+## Known Gaps & TODOs (Updated)
+1. ~~`app/composables/useChatProvider.ts` issues~~ → **FIXED**
+2. ~~`app/stores/chat.sessions.ts` repository contract mismatch~~ → **FIXED**
+3. ~~`ChatMessage` type `updatedAt` field missing~~ → **FIXED**
+4. **Provider endpoint routing**: Client providers call `/api/v1/ai/chat` but streaming is at `/api/v1/ai/chats/[id]/messages`
+   - Need to align client provider endpoints with server streaming API
+   - Consider adding multiplexer route or updating provider implementations
+5. **Legacy OpenAI endpoints**: `/api/v1/openai/chats.*` still exist alongside AI SDK endpoints
+   - Decide: deprecate legacy or keep for backwards compatibility
+6. **Testing**: No specs under `tests/` yet
+   - Need smoke tests for auth flow
+   - Need tests for AI SDK streaming endpoint
+   - Need tests for chat persistence
+7. **User Management UI**: Backend ready, UI missing
+   - `/api/v1/users` endpoints exist and working
+   - Need UI to select/create users
+   - Need user picker modal in app shell
+8. **Chat Discovery UI**: Backend ready, UI incomplete
+   - Need chat list page to browse previous conversations
+   - Need "new chat" flow with provider/model selection
+   - Need ability to resume existing chats
+9. **Multi-provider UI**: Only OpenAI wired up in default session
+   - Anthropic and Google providers installed but not exposed in UI
+   - Need provider selection dropdown/modal
 
 ## Suggested Next Steps (priority order)
-1. Fix provider plumbing (`useChatProvider`, `/api/v1/chat` route or per-provider URLs) so DeepSeek chat can actually send/receive.
-2. Reconcile `chatRepository` contract with Pinia session store; ensure hydration/persist flow works in browser and falls back gracefully server-side.
-3. Wire OpenRouter response into transcript with reasoning bubble (already supported in `MessageList.vue`).
-4. Close the user-management loop: verify `/api/v1/users` POST works, surface it through a modal on the user-select page, and persist the chosen user in Pinia.
-5. Add provider/model selection step before entering the chat (OpenAI SDK + `gpt-5-nano` for now).
-6. Build the chat directory view so users can list, create, and resume chats against the chosen provider.
-7. Add minimal Vitest/Nuxt tests: DeepSeek page renders prompts, `/api/v1/openrouter/chat` handles missing key, etc.
-8. Harden backend streaming SDK route or remove it if out-of-scope to reduce confusion.
-9. Document env vars (`OPENROUTER_API_KEY`, etc.) in README (currently boilerplate).
+1. **Align client-side providers with AI SDK streaming endpoints**
+   - Update `ai-openai.ts` to use `/api/v1/ai/chats/[id]/messages` instead of generic `/api/v1/ai/chat`
+   - Ensure provider send flow creates chat first, then streams messages
+2. **Build chat discovery UI**
+   - Create `/chats` page to list user's previous conversations
+   - Add "New Chat" button with provider/model selection
+   - Wire up chat resume functionality
+3. **Build user management UI**
+   - Add user selector dropdown in app header/sidebar
+   - Create "Create User" modal
+   - Persist selected user in auth store
+4. **Add provider selection UI**
+   - Provider picker modal (OpenAI, Anthropic, Google)
+   - Model dropdown based on selected provider
+   - Save connection preferences per user
+5. **Testing**
+   - Auth flow tests (login, signup, protected routes)
+   - AI SDK streaming endpoint tests
+   - Chat persistence and conflict resolution tests
+6. **Clean up legacy code**
+   - Decide on legacy `/api/v1/openai/*` endpoints (deprecate or keep)
+   - Remove unused provider files if any
+7. **Documentation**
+   - Document required env vars (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`)
+   - Add setup guide for database initialization
+   - Document authentication flow
 
 ## Tooling & Setup Notes
 - Install: `bun install` (keep `bun.lock` in sync).
@@ -69,12 +128,65 @@
 - Tests (once added): `bunx nuxt test`.
 - ESLint: `bunx eslint . --fix` respecting @antfu config (two spaces, single quotes, no semis).
 
+## Provider Architecture Patterns
+
+This project supports **three types of AI provider integration** to allow maximum flexibility:
+
+### 1. **AI SDK Providers** (`type: 'ai-sdk'`)
+- Uses Vercel AI SDK (`@ai-sdk/*` packages) for streaming
+- Best for: streaming responses, structured outputs, tool calling
+- Example: `ai-openai` provider
+- Server endpoint: `/api/v1/ai/chats/[id]/messages` (streaming with SSE)
+- Benefits: Built-in streaming, multimodal support, standardized API
+
+### 2. **Proxy Providers** (`type: 'proxy'`)
+- Simple HTTP proxy to external AI services
+- Best for: third-party aggregators (OpenRouter), custom endpoints
+- Example: `openrouter`, `anthropic`, `google` providers
+- Server endpoint pattern: `/api/v1/{provider}/chat`
+- Benefits: Easy to add new providers, no SDK dependencies
+- **Generic factory available**: Use `createProxyProvider(key, endpoint)` to add new providers without creating files
+
+### 3. **Native Providers** (`type: 'native'`)
+- Direct integration with provider's SDK
+- Best for: provider-specific features, maximum control
+- Example: `openai` (native) using OpenAI SDK directly
+- Server endpoint pattern: `/api/v1/{provider}/chat`
+- Benefits: Full access to provider features, no abstraction overhead
+
+### Adding a New Provider
+
+**Option A: Use the generic proxy factory** (simplest):
+```ts
+// In app/services/providers/index.ts registry
+'my-provider': () => createProxyProvider('my-provider', 'my-provider')
+```
+Then create `/server/api/v1/my-provider/chat.post.ts` following the OpenRouter pattern.
+
+**Option B: Create a dedicated adapter** (for complex needs):
+1. Create `app/services/providers/my-provider.ts`
+2. Implement `ProviderAdapter` interface with `key`, `type`, and `chat.send()`
+3. Add to registry in `app/services/providers/index.ts`
+4. Add metadata to `PROVIDER_INFO` for UI display
+
+### Provider Response Format
+All providers must return:
+```ts
+{
+  content: string        // Required: main response text
+  reasoning?: string     // Optional: for reasoning models (DeepSeek R1, etc.)
+  provider?: string      // Optional: provider identifier
+  model?: string         // Optional: model used
+}
+```
+
 ## Key File References
-- Frontend entry: `app/pages/deep-seek.vue`
-- Pinia stores: `app/stores/chat.runtime.ts`, `app/stores/chat.sessions.ts`
-- Provider registry: `app/services/providers/index.ts`, `app/services/providers/nuxt.ts`
-- Chat repository: `app/services/chatRepository.ts`
-- Server proxies: `server/api/v1/openrouter/chat.post.ts`, `server/api/v1/openai/chat.post.ts`
-- DB helpers: `server/db/chats.ts`, `server/db/connections.ts`, `server/db/users.ts`
+- **Pinia stores**: `app/stores/chat.runtime.ts`, `app/stores/chat.sessions.ts`, `app/stores/auth.ts`, `app/stores/users.ts`
+- **Provider system**: `app/services/providers/index.ts` (registry + factory), `app/services/providers/types.ts` (interfaces)
+- **Chat repository**: `app/services/chatRepository.ts` (dual-layer persistence with conflict resolution)
+- **Server AI SDK**: `server/api/v1/ai/chats/[id]/messages.post.ts` (streaming), `server/utils/ai.ts` (provider factory)
+- **Server proxies**: `server/api/v1/openrouter/chat.post.ts`, `server/api/v1/openai/chat.post.ts`
+- **DB helpers**: `server/db/chats.ts`, `server/db/connections.ts`, `server/db/users.ts`
+- **Auth**: `server/api/v1/auth/*`, `server/utils/auth.ts`, `server/utils/jwt.ts`
 
 Keep this brief updated after each meaningful change so subsequent agents and humans stay aligned.

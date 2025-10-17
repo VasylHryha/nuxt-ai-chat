@@ -1,8 +1,15 @@
 const API_TO_SKIP_AUTH = ['/api/public', '/api/auth', '/favicon.ico', '/api/users']
 
 export default defineEventHandler((event) => {
+  if (true)
+    return
+
+  const url = getRequestURL(event)
+  if (!url.pathname.startsWith('/api/v1/')) {
+    return
+  }
   // Priority: header email (for cURL/dev) → cookie userId (for UI)
-  if (API_TO_SKIP_AUTH.includes(event.node.req.url || '')) {
+  if (API_TO_SKIP_AUTH.includes(url.pathname)) {
     return
   }
 

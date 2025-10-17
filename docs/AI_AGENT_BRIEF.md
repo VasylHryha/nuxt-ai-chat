@@ -78,7 +78,7 @@
 5. **Legacy OpenAI endpoints**: `/api/v1/openai/chats.*` still exist alongside AI SDK endpoints
    - Decide: deprecate legacy or keep for backwards compatibility
 6. **Testing**: Vitest suite expanding
-   - ✅ Coverage for JWT/password utils, auth middleware, provider payloads, auth API routes, chat list/proxy/streaming endpoints (SSE mocked), and `chatRepository` merge/persistence logic
+   - ✅ Coverage for JWT/password utils, auth middleware, provider payloads (incl. error propagation), auth API routes, chat list/proxy/streaming endpoints (SSE mocked + failure paths), `chatRepository` merge/persistence logic, database CRUD/constraints, multi-user isolation, and input validation failure paths
    - Still need chat persistence conflict tests and multi-user authorization edge cases
 7. **User Management UI**: Backend ready, UI missing
    - `/api/v1/users` endpoints exist and working

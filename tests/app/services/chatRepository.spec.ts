@@ -209,4 +209,151 @@ describe('chatRepository', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/chats', { method: 'GET' })
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/chats', { method: 'PUT', body: merged })
   })
+
+  it('preserves concurrent offline/remote messages in chronological order', async () => {
+    vi.useFakeTimers()
+    const local: DirectorySnapshot = {
+      currentProfileId: 'p1',
+      profiles: {
+        p1: {
+          id: 'p1',
+          name: 'Local',
+          currentSessionId: 's1',
+          createdAt: 1,
+          updatedAt: 5,
+          sessions: {
+            s1: {
+              id: 's1',
+              title: 'Session',
+              provider: 'openai',
+              model: 'gpt-4o',
+              createdAt: 1,
+              updatedAt: 5,
+              cappedByCount: false,
+              cappedByChars: false,
+              charCount: 10,
+              messages: [
+                { id: 'm1', role: 'user', content: 'hey', createdAt: 1, updatedAt: 1 },
+                { id: 'm-local', role: 'assistant', content: 'local draft', createdAt: 4, updatedAt: 4 },
+              ],
+            },
+          },
+        },
+      },
+    }
+
+    const remote: DirectorySnapshot = {
+      currentProfileId: 'p1',
+      profiles: {
+        p1: {
+          id: 'p1',
+          name: 'Remote',
+          currentSessionId: 's1',
+          createdAt: 1,
+          updatedAt: 6,
+          sessions: {
+            s1: {
+              id: 's1',
+              title: 'Session remote',
+              provider: 'openai',
+              model: 'gpt-4o',
+              createdAt: 1,
+              updatedAt: 6,
+              cappedByCount: false,
+              cappedByChars: false,
+              charCount: 14,
+              messages: [
+                { id: 'm1', role: 'user', content: 'hey', createdAt: 1, updatedAt: 1 },
+                { id: 'm-remote', role: 'assistant', content: 'remote reply', createdAt: 5, updatedAt: 5 },
+              ],
+            },
+          },
+        },
+      },
+    }
+
+    fetchMock.mockResolvedValueOnce(remote)
+    fetchMock.mockResolvedValue(undefined)
+
+    const merged = await chatRepository.syncPull(local)
+    const messages = merged.profiles.p1.sessions.s1.messages
+
+    expect(messages.map(m => m.id)).toEqual(['m1', 'm-local', 'm-remote'])
+    expect(messages[1]).toMatchObject({ id: 'm-local', content: 'local draft' })
+    expect(messages[2]).toMatchObject({ id: 'm-remote', content: 'remote reply' })
+  })
+
+  it('clears current session when remote snapshot removes the session', async () => {
+    vi.useFakeTimers()
+    const local: DirectorySnapshot = {
+      currentProfileId: 'p1',
+      profiles: {
+        p1: {
+          id: 'p1',
+          name: 'Local',
+          currentSessionId: 's1',
+          createdAt: 1,
+          updatedAt: 5,
+          sessions: {
+            s1: {
+              id: 's1',
+              title: 'Session',
+              provider: 'openai',
+              model: 'gpt-4o',
+              createdAt: 1,
+              updatedAt: 5,
+              cappedByCount: false,
+              cappedByChars: false,
+              charCount: 10,
+              messages: [],
+            },
+          },
+        },
+      },
+    }
+
+    const remote: DirectorySnapshot = {
+      currentProfileId: 'p1',
+      profiles: {
+        p1: {
+          id: 'p1',
+          name: 'Remote',
+          currentSessionId: '',
+          createdAt: 1,
+          updatedAt: 8,
+          sessions: {},
+        },
+      },
+    }
+
+    fetchMock.mockResolvedValueOnce(remote)
+    fetchMock.mockResolvedValue(undefined)
+
+    const merged = await chatRepository.syncPull(local)
+    expect(Object.keys(merged.profiles.p1.sessions)).toEqual(['s1'])
+    expect(merged.profiles.p1.currentSessionId).toBe('')
+  })
+
+  it('returns local snapshot untouched when remote fetch fails', async () => {
+    const local: DirectorySnapshot = {
+      currentProfileId: 'p1',
+      profiles: {
+        p1: {
+          id: 'p1',
+          name: 'Local only',
+          currentSessionId: '',
+          createdAt: 1,
+          updatedAt: 1,
+          sessions: {},
+        },
+      },
+    }
+
+    fetchMock.mockRejectedValueOnce(new Error('network down'))
+
+    const merged = await chatRepository.syncPull(local)
+
+    expect(merged).toEqual(local)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })

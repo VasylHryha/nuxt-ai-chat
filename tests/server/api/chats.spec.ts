@@ -89,6 +89,7 @@ describe('chat API endpoints', () => {
     })
 
     const event = createGetEvent(`/api/v1/chats?email=${encodeURIComponent(user.email)}`)
+    event.context.user = { id: user.id, email: user.email }
     const result = await listChatsHandler(event)
 
     expect(result).toHaveLength(1)
@@ -104,6 +105,7 @@ describe('chat API endpoints', () => {
 
   it('rejects requests without email query parameter', async () => {
     const event = createGetEvent('/api/v1/chats')
+    event.context.user = { id: 'missing', email: 'missing@example.com' }
     await expect(listChatsHandler(event)).rejects.toMatchObject({
       statusCode: 400,
       statusMessage: 'email is required',
@@ -112,6 +114,7 @@ describe('chat API endpoints', () => {
 
   it('returns 404 when requesting chats for unknown user', async () => {
     const event = createGetEvent('/api/v1/chats?email=missing@example.com')
+    event.context.user = { id: 'missing', email: 'missing@example.com' }
     await expect(listChatsHandler(event)).rejects.toMatchObject({
       statusCode: 404,
       statusMessage: 'User not found',
@@ -125,6 +128,8 @@ describe('chat API endpoints', () => {
       messages: [{ role: 'user', content: 'Hello there' }],
       model: 'deepseek/deepseek-r1',
     })
+
+    event.context.user = { id: 'proxy-user', email: 'proxy@example.com' }
 
     const response = await proxyChatHandler(event)
 
@@ -145,6 +150,7 @@ describe('chat API endpoints', () => {
     const event = createPostEvent('/api/v1/chats', {
       messages: [{ role: 'user', content: 'Missing provider' }],
     })
+    event.context.user = { id: 'proxy-user', email: 'proxy@example.com' }
 
     await expect(proxyChatHandler(event)).rejects.toMatchObject({
       statusCode: 400,
@@ -175,10 +181,9 @@ describe('chat API endpoints', () => {
       content: 'Test prompt',
       provider: 'openai',
       model: 'gpt-4o-mini',
-    }, {
-      'x-user-id': user.id,
     })
     event.context.params = { id: chat.id }
+    event.context.user = { id: user.id, email: user.email }
 
     await streamMessagesHandler(event)
 
@@ -198,5 +203,44 @@ describe('chat API endpoints', () => {
       apiKey: 'openai-test-key',
       baseURL: undefined,
     })
+  })
+
+  it('propagates provider stream failures without storing assistant messages', async () => {
+    const user = insertUser({ email: 'error@example.com', name: 'Error' })
+    const chat = createChatForUser({
+      email: user.email,
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      title: 'Will fail',
+    })
+
+    const streamError = new Error('stream boom')
+    streamTextMock.mockResolvedValueOnce({
+      stream: (async function* () {
+        yield { type: 'text-delta', textDelta: 'partial' }
+        throw streamError
+      })(),
+    })
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const event = createPostEvent(`/api/v1/ai/chats/${chat.id}/messages`, {
+      content: 'Trigger failure',
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+    })
+    event.context.params = { id: chat.id }
+    event.context.user = { id: user.id, email: user.email }
+
+    await expect(streamMessagesHandler(event)).rejects.toMatchObject({
+      statusCode: 502,
+      statusMessage: 'Provider stream failed',
+    })
+
+    const messages = db.prepare('SELECT role, content FROM messages WHERE chat_id=? ORDER BY created_at ASC').all(chat.id) as Array<{ role: string, content: string }>
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toMatchObject({ role: 'user', content: 'Trigger failure' })
+
+    consoleSpy.mockRestore()
   })
 })

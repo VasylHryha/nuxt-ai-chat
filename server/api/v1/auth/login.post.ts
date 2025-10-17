@@ -1,5 +1,6 @@
 // server/api/v1/auth/login.post.ts
 import { getPasswordHashByEmail } from '@/server/db/users'
+import { isValidEmail } from '@/server/utils/validators'
 
 export default defineEventHandler(async (event) => {
   const { email, password } = await readBody<{ email: string, password: string }>(event)
@@ -7,6 +8,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'email and password required' })
 
   const clean = String(email).trim().toLowerCase()
+  if (!isValidEmail(clean))
+    throw createError({ statusCode: 400, statusMessage: 'Invalid email' })
   const record = getPasswordHashByEmail(clean)
 
   if (!record)

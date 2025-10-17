@@ -1,6 +1,263 @@
-# TODO: Code Quality & Polish Tasks
+# TODO: Code Quality, Testing & Polish Tasks
 
 This document tracks remaining improvements to bring the codebase to production-ready status.
+
+---
+
+## 🧪 Test Coverage Status & Plan
+
+### ✅ Current Test Coverage (7 test files, ~40 tests)
+
+**Excellent Coverage:**
+1. **JWT Utils** (`tests/server/utils/jwt.spec.ts`) ✅
+   - Sign/verify with issuer enforcement
+   - Tampering detection (signature validation)
+   - Token expiration
+   - Issuer mismatch rejection
+   - **Assessment**: Complete, well-tested
+
+2. **Password Utils** (`tests/server/utils/password.spec.ts`) ✅
+   - Hash with deterministic test mock
+   - Verify hashed passwords (correct/wrong)
+   - **Assessment**: Adequate for Argon2 wrapper
+
+3. **Auth Middleware** (`tests/server/middleware/auth.global.spec.ts`) ✅
+   - Public routes (no token required)
+   - Protected routes (missing token rejection)
+   - Valid Bearer token → user context
+   - Invalid cookie tokens
+   - **Assessment**: Core auth flow covered
+
+4. **Provider Adapters** (`tests/app/services/providers.spec.ts`) ✅
+   - AI SDK provider payload structure
+   - Native OpenAI provider endpoint
+   - Proxy provider factory (generic)
+   - **Assessment**: Provider pattern verified
+
+5. **Auth API Routes** (`tests/server/api/auth.spec.ts`) ✅
+   - Signup with cookie setting
+   - Duplicate signup rejection
+   - Login with correct password
+   - Login with wrong password rejection
+   - /me with valid context
+   - /me without user (401)
+   - Logout cookie clearing
+   - **Assessment**: Complete auth lifecycle
+
+6. **Chat API** (`tests/server/api/chats.spec.ts`) ✅
+   - List chats by user email
+   - Missing email rejection (400)
+   - Unknown user (404)
+   - Proxy POST to provider endpoint
+   - Missing provider rejection
+   - **SSE streaming with persistence** (excellent!)
+   - **Assessment**: Core chat operations covered
+
+7. **Chat Repository** (`tests/app/services/chatRepository.spec.ts`) ✅
+   - Load from localStorage (offline-first)
+   - Save with debounced PUT
+   - Conflict resolution (last-write-wins merge)
+   - Remote sync pull
+   - **Assessment**: Persistence layer well-tested
+
+### 🟡 Priority 1: Core Functionality Gaps (HIGH)
+
+#### T1.1: Database Layer Tests
+**Status**: ✅ Completed
+**Files**: `tests/server/db/users.spec.ts`, `tests/server/db/chats.spec.ts`
+**Coverage**:
+- User CRUD (insert/list/lookups), uniqueness constraints
+- Password credential upsert behavior + cascade on delete
+- Chat creation with reusable connections and filter queries
+- Foreign key cascade from user → chats/connections
+
+#### T1.2: Multi-User Authorization Tests
+**Status**: ✅ Completed
+**Files**: `tests/server/api/authorization.spec.ts`, guarded routes updated
+**Coverage**:
+- Ensures authenticated users cannot query other users’ chats (403)
+- Blocks streaming into chats not owned by the requester (404)
+- `/api/v1/chats` GET/POST and streaming handlers now require auth context
+
+#### T1.3: Input Validation Tests
+**Status**: ✅ Completed
+**Files**: `tests/server/api/validation.spec.ts`, shared validator utilities
+**Coverage**:
+- Signup/login email format enforcement + password length checks
+- Chat proxy provider/message validation (roles/content)
+- Injection attempts rejected with explicit 400 responses
+
+### 🟠 Priority 2: Error Handling & Edge Cases (MEDIUM)
+
+#### T2.1: Provider Error Handling Tests
+**Status**: ✅ Completed
+**Files**: `tests/app/services/providers.spec.ts`
+**Coverage**:
+- Aborted requests propagate `AbortError`
+- 429 and 500 responses surface structured errors
+- Non-JSON/malformed payloads handled without crashes
+- Timeout/backoff checks remain TODO (future enhancement)
+
+#### T2.2: Chat Repository Conflict Resolution Tests
+**Status**: ✅ Completed
+**Files**: `tests/app/services/chatRepository.spec.ts`
+**Coverage**:
+- Concurrent offline/remote messages merged with correct ordering
+- Remote session removal clears local `currentSessionId` while preserving data
+- Network failure during sync returns local snapshot without side effects
+- Remaining wishlist: localStorage quota + exponential backoff handling
+
+#### T2.3: SSE Streaming Error Tests
+**Status**: ✅ Completed
+**Files**: `tests/server/api/chats.spec.ts`, streaming handler updates
+**Coverage**:
+- Mid-stream provider failures emit 502 errors and avoid assistant persistence
+- Console logging added for easier debugging
+- Remaining wishlist: client disconnect detection & DB write failure simulation
+
+### 🟢 Priority 3: Integration & E2E Tests (LOW-MEDIUM)
+
+#### T3.1: Full Auth Flow Integration Test
+**Missing**: End-to-end signup → login → access protected resource
+**Files to create**: `tests/integration/auth-flow.spec.ts`
+**Effort**: 1 hour
+**Why**: Validates complete user journey
+
+**Tests needed**:
+- Signup → auto-login → access /me → list chats
+- Logout → re-login → access same chats
+- Expired token → 401 → refresh flow (if implemented)
+
+#### T3.2: Full Chat Flow Integration Test
+**Missing**: Create user → create chat → send message → persist → retrieve
+**Files to create**: `tests/integration/chat-flow.spec.ts`
+**Effort**: 1 hour
+**Why**: Validates end-to-end chat lifecycle
+
+**Tests needed**:
+- User creates chat → sends message → receives AI response → persists
+- User lists chats → resumes existing chat → sends follow-up
+- User switches providers mid-conversation
+
+### 🔵 Priority 4: Performance & Load Tests (NICE-TO-HAVE)
+
+#### T4.1: Concurrency Tests
+**Missing**: Multiple simultaneous requests
+**Files to create**: `tests/performance/concurrency.spec.ts`
+**Effort**: 2 hours
+**Why**: Ensures thread-safety, connection pooling
+
+**Tests needed**:
+- 10 simultaneous logins (different users)
+- 5 concurrent streaming sessions
+- Database connection pool under load
+- Race conditions in chat repository merge
+
+#### T4.2: Large Data Tests
+**Missing**: Behavior with many chats/messages
+**Files to create**: `tests/performance/large-data.spec.ts`
+**Effort**: 1 hour
+**Why**: Validates pagination, query performance
+
+**Tests needed**:
+- User with 1000 chats → list performance
+- Chat with 100 messages → load performance
+- Message limits enforcement (50 messages, 100k chars)
+
+---
+
+## 📊 Test Priority Matrix
+
+| Priority | Category | Tests Needed | Effort | Impact |
+|----------|----------|--------------|--------|--------|
+| **P1** | Database CRUD | 15 tests | 2h | HIGH |
+| **P1** | Multi-user auth | 8 tests | 1h | CRITICAL |
+| **P1** | Input validation | 12 tests | 1h | HIGH |
+| **P2** | Provider errors | 8 tests | 45min | MEDIUM |
+| **P2** | Conflict resolution | 10 tests | 1h | MEDIUM |
+| **P2** | Streaming errors | 6 tests | 45min | MEDIUM |
+| **P3** | Auth flow E2E | 5 tests | 1h | LOW |
+| **P3** | Chat flow E2E | 5 tests | 1h | LOW |
+| **P4** | Concurrency | 8 tests | 2h | LOW |
+| **P4** | Large data | 6 tests | 1h | LOW |
+
+**Total estimated effort**: ~12 hours for complete coverage
+
+---
+
+## 🎯 Recommended Test Implementation Order
+
+**Week 1** (Foundation - ~4 hours):
+1. T1.1: Database layer tests (2h) - Critical data integrity
+2. T1.2: Multi-user authorization (1h) - Security critical
+3. T1.3: Input validation (1h) - Prevents bad data early
+
+**Week 2** (Robustness - ~3 hours):
+4. T2.1: Provider error handling (45min)
+5. T2.2: Conflict resolution (1h)
+6. T2.3: Streaming errors (45min)
+
+**Week 3** (Integration - ~2 hours):
+7. T3.1: Auth flow E2E (1h)
+8. T3.2: Chat flow E2E (1h)
+
+**Optional** (Performance):
+9. T4.1: Concurrency tests (2h)
+10. T4.2: Large data tests (1h)
+
+---
+
+## ✅ Test Quality Assessment
+
+### What's Excellent About Current Tests:
+
+1. **Proper Mocking**:
+   - Uses Vitest's `vi.fn()` and `vi.mock()` correctly
+   - Mock lifecycle management (beforeEach cleanup)
+   - Deterministic time with `vi.useFakeTimers()`
+
+2. **Good Assertions**:
+   - Tests both success and failure paths
+   - Verifies HTTP status codes and error messages
+   - Checks side effects (cookies, database inserts)
+   - Uses `toMatchObject` for flexible matching
+   - Inline snapshots for payload verification
+
+3. **Test Isolation**:
+   - Database reset between tests (`__NUXT_RESET_DB__`)
+   - localStorage cleared per test
+   - No test interdependencies
+
+4. **Realistic Scenarios**:
+   - SSE streaming test is particularly well-done
+   - Conflict resolution merge test covers complex case
+   - Security tests (tampering, expiration) are thorough
+
+### Minor Improvements Possible:
+
+1. **Add describe blocks for grouping**:
+   ```ts
+   describe('error handling', () => {
+     it('rejects missing credentials')
+     it('rejects invalid tokens')
+   })
+   ```
+
+2. **Extract test helpers**:
+   - `createJsonEvent` appears in multiple files → shared utility
+   - User creation fixture: `createTestUser()`
+
+3. **Add parameterized tests** for similar cases:
+   ```ts
+   it.each([
+     ['invalid-email', 400],
+     ['user@toolong'.repeat(100), 400],
+   ])('rejects malformed email: %s', async (email, expectedCode) => {
+     // test
+   })
+   ```
+
+---
 
 ## ✅ Completed (Recent)
 

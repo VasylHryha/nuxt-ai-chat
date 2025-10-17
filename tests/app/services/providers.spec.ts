@@ -1,5 +1,5 @@
 import type { Mock } from 'vitest'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { aiOpenAIProvider } from '@/app/services/providers/ai-openai'
 import { openaiNativeProvider } from '@/app/services/providers/openai.native'
 import { createProxyProvider } from '@/app/services/providers/index'
@@ -7,6 +7,10 @@ import { createProxyProvider } from '@/app/services/providers/index'
 const fetchMock = (globalThis as any).__NUXT_FETCH_MOCK__ as Mock
 
 describe('provider request builders', () => {
+  beforeEach(() => {
+    fetchMock.mockReset()
+  })
+
   it('sends AI SDK provider payloads to the unified endpoint', async () => {
     fetchMock.mockResolvedValueOnce({ content: 'hello', reasoning: 'trace', model: 'gpt-4o' })
     const provider = aiOpenAIProvider()
@@ -119,6 +123,68 @@ describe('provider request builders', () => {
       reasoning: undefined,
       provider: 'anthropic',
       model: 'claude',
+    })
+  })
+
+  it('propagates abort errors for AI SDK provider', async () => {
+    const abortError = Object.assign(new Error('Aborted'), { name: 'AbortError' })
+    fetchMock.mockRejectedValueOnce(abortError)
+    const provider = aiOpenAIProvider()
+    const controller = new AbortController()
+    controller.abort()
+
+    const sendPromise = provider.chat.send({
+      messages: [{ role: 'user', content: 'Hi' }],
+      model: 'gpt-4o',
+      temperature: 0,
+      signal: controller.signal,
+    })
+
+    await expect(sendPromise).rejects.toBe(abortError)
+  })
+
+  it('surfaces rate limit errors from proxy providers', async () => {
+    const rateLimitError = Object.assign(new Error('Too Many Requests'), { statusCode: 429 })
+    fetchMock.mockRejectedValueOnce(rateLimitError)
+    const provider = createProxyProvider('openrouter', 'openrouter')
+
+    await expect(provider.chat.send({
+      messages: [{ role: 'user', content: 'Hello' }],
+      model: 'deepseek/deepseek-r1',
+      temperature: 0.2,
+      signal: undefined,
+    })).rejects.toBe(rateLimitError)
+  })
+
+  it('surfaces server errors from native provider', async () => {
+    const serverError = Object.assign(new Error('Upstream failure'), { statusCode: 500 })
+    fetchMock.mockRejectedValueOnce(serverError)
+    const provider = openaiNativeProvider()
+
+    await expect(provider.chat.send({
+      messages: [{ role: 'user', content: 'Hi' }],
+      model: 'gpt-4o-mini',
+      temperature: 0.3,
+      signal: undefined,
+    })).rejects.toBe(serverError)
+  })
+
+  it('handles malformed responses gracefully', async () => {
+    fetchMock.mockResolvedValueOnce('garbled response')
+    const provider = createProxyProvider('google', 'google')
+
+    const result = await provider.chat.send({
+      messages: [{ role: 'user', content: 'ping' }],
+      model: 'gemini',
+      temperature: undefined,
+      signal: undefined,
+    })
+
+    expect(result).toEqual({
+      content: 'garbled response',
+      reasoning: undefined,
+      provider: 'google',
+      model: undefined,
     })
   })
 })

@@ -1,10 +1,18 @@
 import { listChatsByUserEmail } from '@/server/db/chats'
+import { requireUser } from '@/server/utils/auth'
+import { isValidEmail } from '@/server/utils/validators'
 
 export default defineEventHandler((event) => {
+  const authUser = requireUser(event)
   const q = getQuery(event)
   const email = String(q.email || '').trim().toLowerCase()
   if (!email)
     throw createError({ statusCode: 400, statusMessage: 'email is required' })
+  if (!isValidEmail(email))
+    throw createError({ statusCode: 400, statusMessage: 'Invalid email' })
+
+  if (email !== authUser.email)
+    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
 
   const provider = q.provider ? String(q.provider) : undefined
   const model = q.model ? String(q.model) : undefined

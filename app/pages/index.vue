@@ -47,7 +47,7 @@ const highlights = [
 
         <div class="flex flex-wrap items-center gap-4">
           <UButton
-            to="/ai-chat"
+            to="/ai-chat/new"
             color="emerald"
             size="lg"
             class="rounded-xl shadow-lg shadow-emerald-500/20"

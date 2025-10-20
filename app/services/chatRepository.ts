@@ -63,7 +63,7 @@ function mergeSnapshots(local: DirectorySnapshot, remote: DirectorySnapshot): Di
 }
 
 // ——— Repository ———
-let pushTimer: any = null
+const pushTimer: any = null
 let syncTimer: any = null
 
 export const chatRepository = {

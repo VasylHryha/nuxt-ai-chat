@@ -41,7 +41,7 @@ Build a production-ready Nuxt 4 starter demonstrating:
 - Uses `@ai-sdk/vue` with Vercel AI SDK
 - Supports streaming via SSE
 - Current implementation: OpenAI via `/api/v1/ai/chats`
-- Example: `app/pages/ai-chat.vue` uses `new Chat()` from AI SDK
+- Example: `app/pages/ai-chat/new.vue` uses `new Chat()` from AI SDK
 
 **B. Proxy Providers** (`type: 'proxy'`)
 - Simple HTTP proxy to external services
@@ -59,10 +59,10 @@ Build a production-ready Nuxt 4 starter demonstrating:
 
 #### 3. Database & Persistence
 
-**Schema** (`db/migrations/001_init.sql`):
+**Schema**:
 - `users` - User accounts (id, email, name, created_at)
 - `credentials` - Argon2 password hashes (user_id, password_hash)
-- `connections` - AI provider configs per user (provider, model, api_key, settings)
+- `connections` - AI provider configs per user (provider, model, ui, api_key, settings)
 - `chats` - Conversation threads (user_id, connection_id, title, provider, model)
 - `messages` - Message history (chat_id, role, content, reasoning, timestamps)
 
@@ -98,7 +98,9 @@ Build a production-ready Nuxt 4 starter demonstrating:
 - `/` - Landing page (public)
 - `/auth/login` - Login form (public)
 - `/auth/signup` - Signup form (public)
-- `/ai-chat` - AI SDK chat interface (protected)
+- `/ai-chat/new` - Start a new AI chat (protected)
+- `/ai-chat/[id]` - Continue an existing AI chat (protected)
+- Route selection centralized in `app/services/providers/routing.ts#getChatRouteFor(provider, model, chatId, ui)`; prefers `ui` from API when present.
 - `/chats` - Chat list dashboard with stats (protected)
 - `/users` - User management (protected)
 
@@ -137,7 +139,7 @@ Build a production-ready Nuxt 4 starter demonstrating:
 
 #### Type 1: AI SDK Provider
 ```typescript
-// app/pages/ai-chat.vue
+// app/pages/ai-chat/new.vue
 import { Chat } from '@ai-sdk/vue'
 
 const chat = new Chat({

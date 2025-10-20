@@ -32,6 +32,7 @@ export interface Connection {
   label: string
   provider: Provider
   model: string
+  ui?: 'ai-sdk' | 'native' | 'proxy'
   base_url?: string
   settings_json?: string
   created_at: number

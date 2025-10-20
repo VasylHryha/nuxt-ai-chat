@@ -1,130 +1,161 @@
-<!-- pages/chats/index.vue -->
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { useChatSessions } from '@/stores/chat.sessions'
+const auth = useAuth()
 
-const sessions = useChatSessions()
-const { sessions: allSessions, currentSessionId } = storeToRefs(sessions)
-const toast = useToast()
+interface Chat {
+  id: string
+  title: string
+  provider: string
+  model: string
+  ui?: 'ai-sdk' | 'native' | 'proxy'
+  createdAt: string
+  updatedAt: string
+  messageCount: number
+  lastMessage: {
+    role: string
+    content: string
+    createdAt: string
+  } | null
+}
 
-const renameState = reactive({
-  open: false,
-  sessionId: '',
-  title: '',
-  error: '',
+// State
+const chats = ref<Chat[]>([])
+const isLoading = ref(true)
+const error = ref<string | null>(null)
+
+// Filters
+const searchQuery = ref('')
+const selectedProvider = ref<string>('all')
+const dateFilter = ref<string>('all') // 'all', 'today', 'week', 'month'
+
+// Fetch chats
+async function fetchChats() {
+  isLoading.value = true
+  error.value = null
+
+  try {
+    const params: any = {
+      email: auth.user?.email,
+    }
+
+    // Add provider filter if selected
+    if (selectedProvider.value !== 'all') {
+      params.provider = selectedProvider.value
+    }
+
+    // Add date filter
+    if (dateFilter.value !== 'all') {
+      const now = Date.now()
+      if (dateFilter.value === 'today') {
+        params.startDate = now - 24 * 60 * 60 * 1000
+      }
+      else if (dateFilter.value === 'week') {
+        params.startDate = now - 7 * 24 * 60 * 60 * 1000
+      }
+      else if (dateFilter.value === 'month') {
+        params.startDate = now - 30 * 24 * 60 * 60 * 1000
+      }
+    }
+
+    const data = await $fetch<Chat[]>('/api/v1/chats', {
+      query: params,
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+      },
+    })
+
+    chats.value = data
+  }
+  catch (err: any) {
+    error.value = err?.message || 'Failed to load chats'
+    console.error('[Chats] Failed to fetch:', err)
+  }
+  finally {
+    isLoading.value = false
+  }
+}
+
+// Delete chat
+async function deleteChat(chatId: string, chatTitle: string) {
+  if (!confirm(`Are you sure you want to delete "${chatTitle}"?`))
+    return
+
+  try {
+    await $fetch(`/api/v1/chats/${chatId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+      },
+    })
+
+    // Remove from list
+    chats.value = chats.value.filter(c => c.id !== chatId)
+  }
+  catch (err: any) {
+    alert(err?.message || 'Failed to delete chat')
+    console.error('[Chats] Failed to delete:', err)
+  }
+}
+
+// Computed: Filtered chats by search query
+const filteredChats = computed(() => {
+  if (!searchQuery.value)
+    return chats.value
+
+  const query = searchQuery.value.toLowerCase()
+  return chats.value.filter(chat =>
+    chat.title.toLowerCase().includes(query)
+    || chat.lastMessage?.content.toLowerCase().includes(query),
+  )
 })
 
-const deleteState = reactive({
-  open: false,
-  sessionId: '',
-  title: '',
-})
+import { getChatRouteFor } from '@/services/providers/routing'
 
-const chatList = computed(() => {
-  return Object.values(allSessions.value).sort((a, b) => b.updatedAt - a.updatedAt)
-})
-
-function onNew() {
-  sessions.createNewSession('New chat', 'ai-openai', 'gpt-4o')
-  navigateTo('/ai-chat')
+// Compute route target per chat based on provider/model
+function getChatLink(chat: Chat) {
+  return getChatRouteFor(chat.provider, chat.model, chat.id, chat.ui)
 }
 
-function openChat(id: string) {
-  currentSessionId.value = id
-  navigateTo('/ai-chat')
+// Format date helper
+function formatDate(dateString: string) {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1)
+    return 'Just now'
+  if (diffMins < 60)
+    return `${diffMins}m ago`
+  if (diffHours < 24)
+    return `${diffHours}h ago`
+  if (diffDays < 7)
+    return `${diffDays}d ago`
+
+  return date.toLocaleDateString()
 }
 
-function renameChat(id: string) {
-  const session = allSessions.value[id]
-  if (!session)
-    return
-  renameState.open = true
-  renameState.sessionId = id
-  renameState.title = session.title
-  renameState.error = ''
-}
-
-function cancelRename() {
-  renameState.open = false
-  renameState.sessionId = ''
-  renameState.title = ''
-  renameState.error = ''
-}
-
-function submitRename() {
-  const session = allSessions.value[renameState.sessionId]
-  if (!session) {
-    cancelRename()
-    return
-  }
-  const nextTitle = renameState.title.trim()
-  if (!nextTitle) {
-    renameState.error = 'Title cannot be empty'
-    return
-  }
-  session.title = nextTitle
-  session.updatedAt = Date.now()
-  sessions.persist()
-  toast.add?.({ title: 'Chat renamed', color: 'emerald' })
-  cancelRename()
-}
-
-function deleteChat(id: string) {
-  const session = allSessions.value[id]
-  if (!session)
-    return
-  deleteState.open = true
-  deleteState.sessionId = id
-  deleteState.title = session.title
-}
-
-function cancelDelete() {
-  deleteState.open = false
-  deleteState.sessionId = ''
-  deleteState.title = ''
-}
-
-function confirmDelete() {
-  const id = deleteState.sessionId
-  if (!id) {
-    cancelDelete()
-    return
-  }
-  delete allSessions.value[id]
-  if (currentSessionId.value === id)
-    currentSessionId.value = ''
-  sessions.persist()
-  toast.add?.({ title: 'Chat deleted', color: 'red' })
-  cancelDelete()
-}
-
-function formatRelativeTime(timestamp: number) {
-  const now = Date.now()
-  const diff = now - timestamp
-  const seconds = Math.floor(diff / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-
-  if (days > 0)
-    return `${days}d ago`
-  if (hours > 0)
-    return `${hours}h ago`
-  if (minutes > 0)
-    return `${minutes}m ago`
-  return 'Just now'
-}
-
+// Provider badge color
 function getProviderColor(provider: string) {
   const colors: Record<string, string> = {
-    'ai-openai': 'text-emerald-300',
-    'openai': 'text-green-300',
-    'openrouter': 'text-blue-300',
-    'anthropic': 'text-amber-300',
-    'google': 'text-red-300',
+    openai: 'emerald',
+    anthropic: 'orange',
+    google: 'blue',
+    openrouter: 'purple',
   }
-  return colors[provider] || 'text-fg-subtle'
+  return colors[provider] || 'gray'
 }
+
+// Load chats on mount
+onMounted(() => {
+  fetchChats()
+})
+
+// Reload when filters change
+watch([selectedProvider, dateFilter], () => {
+  fetchChats()
+})
 
 useHead({ title: 'My Chats · Nuxt AI Chat' })
 </script>
@@ -134,232 +165,165 @@ useHead({ title: 'My Chats · Nuxt AI Chat' })
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-semibold text-fg">
+        <h1 class="text-3xl font-bold text-fg">
           My Chats
         </h1>
         <p class="text-sm text-fg-muted mt-1">
-          View and manage your conversations
+          Browse and manage your conversations
         </p>
       </div>
-      <UButton
-        color="emerald"
-        size="md"
-        class="rounded-xl"
-        icon="i-heroicons-plus-20-solid"
-        @click="onNew"
+      <NuxtLink
+        to="/ai-chat/new"
+        class="chip-accent px-4 py-2 rounded-lg font-medium flex items-center gap-2"
       >
+        <UIcon name="i-heroicons-plus-20-solid" />
         New Chat
-      </UButton>
+      </NuxtLink>
     </div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div class="panel shadow-soft p-4">
-        <div class="flex items-center gap-3">
-          <div
-            class="size-10 rounded-lg bg-emerald-500/15 border border-emerald-400/25 flex items-center justify-center"
-          >
-            <UIcon name="i-heroicons-chat-bubble-left-right-20-solid" class="text-emerald-300 size-5" />
-          </div>
-          <div>
-            <p class="text-2xl font-semibold text-fg">
-              {{ chatList.length }}
-            </p>
-            <p class="text-xs text-fg-muted">
-              Total Chats
-            </p>
-          </div>
-        </div>
+    <!-- Filters -->
+    <div class="panel p-4 flex flex-wrap gap-3">
+      <!-- Search -->
+      <div class="flex-1 min-w-[200px]">
+        <UInput
+          v-model="searchQuery"
+          placeholder="Search by title or message..."
+          icon="i-heroicons-magnifying-glass-20-solid"
+        />
       </div>
 
-      <div class="panel shadow-soft p-4">
-        <div class="flex items-center gap-3">
-          <div class="size-10 rounded-lg bg-blue-500/15 border border-blue-400/25 flex items-center justify-center">
-            <UIcon name="i-heroicons-envelope-20-solid" class="text-blue-300 size-5" />
-          </div>
-          <div>
-            <p class="text-2xl font-semibold text-fg">
-              {{ chatList.reduce((sum, c) => sum + c.messages.length, 0) }}
-            </p>
-            <p class="text-xs text-fg-muted">
-              Total Messages
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel shadow-soft p-4">
-        <div class="flex items-center gap-3">
-          <div class="size-10 rounded-lg bg-purple-500/15 border border-purple-400/25 flex items-center justify-center">
-            <UIcon name="i-heroicons-circle-stack-20-solid" class="text-purple-300 size-5" />
-          </div>
-          <div>
-            <p class="text-2xl font-semibold text-fg">
-              {{ new Set(chatList.map(c => c.provider)).size }}
-            </p>
-            <p class="text-xs text-fg-muted">
-              Providers Used
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Chat List -->
-    <div v-if="chatList.length > 0" class="space-y-3">
-      <div
-        v-for="chat in chatList"
-        :key="chat.id"
-        class="panel shadow-soft p-4 hover:border-emerald-400/30 transition-all cursor-pointer group"
-        @click="openChat(chat.id)"
+      <!-- Provider Filter -->
+      <select
+        v-model="selectedProvider"
+        class="px-3 py-2 rounded-lg border border-[var(--panel-border)] bg-[var(--panel)] text-fg"
       >
-        <div class="flex items-start justify-between gap-4">
-          <div class="flex-1 min-w-0">
-            <!-- Title & Provider -->
-            <div class="flex items-center gap-2 mb-2">
-              <h3 class="text-base font-semibold text-fg truncate">
-                {{ chat.title }}
-              </h3>
-              <UBadge
-                variant="soft"
-                size="sm"
-                class="rounded-md shrink-0"
-                :class="getProviderColor(chat.provider)"
-              >
-                {{ chat.provider }}
-              </UBadge>
-              <UBadge
-                v-if="chat.id === currentSessionId"
-                variant="soft"
-                size="sm"
-                color="emerald"
-                class="rounded-md shrink-0"
-              >
-                Active
-              </UBadge>
-            </div>
+        <option value="all">
+          All Providers
+        </option>
+        <option value="openai">
+          OpenAI
+        </option>
+        <option value="anthropic">
+          Anthropic
+        </option>
+        <option value="google">
+          Google
+        </option>
+        <option value="openrouter">
+          OpenRouter
+        </option>
+      </select>
 
-            <!-- Last Message -->
-            <p v-if="chat.messages.length > 0" class="text-sm text-fg-muted truncate mb-2">
-              {{ chat.messages[chat.messages.length - 1].content.slice(0, 100) }}
-            </p>
-            <p v-else class="text-sm text-fg-subtle italic mb-2">
-              No messages yet
-            </p>
+      <!-- Date Filter -->
+      <select
+        v-model="dateFilter"
+        class="px-3 py-2 rounded-lg border border-[var(--panel-border)] bg-[var(--panel)] text-fg"
+      >
+        <option value="all">
+          All Time
+        </option>
+        <option value="today">
+          Today
+        </option>
+        <option value="week">
+          This Week
+        </option>
+        <option value="month">
+          This Month
+        </option>
+      </select>
+    </div>
 
-            <!-- Metadata -->
-            <div class="flex items-center gap-4 text-xs text-fg-subtle">
-              <span class="flex items-center gap-1">
-                <UIcon name="i-heroicons-clock-16-solid" />
-                {{ formatRelativeTime(chat.updatedAt) }}
-              </span>
-              <span class="flex items-center gap-1">
-                <UIcon name="i-heroicons-chat-bubble-left-16-solid" />
-                {{ chat.messages.length }} messages
-              </span>
-              <span v-if="chat.model" class="flex items-center gap-1 truncate">
-                <UIcon name="i-heroicons-cpu-chip-16-solid" />
-                {{ chat.model }}
-              </span>
-            </div>
-          </div>
+    <!-- Loading State -->
+    <div v-if="isLoading" class="text-center py-12">
+      <UIcon name="i-heroicons-arrow-path-20-solid" class="text-4xl text-fg-muted animate-spin mx-auto" />
+      <p class="text-fg-muted mt-2">
+        Loading chats...
+      </p>
+    </div>
 
-          <!-- Actions -->
-          <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              class="size-8 rounded-lg hover:bg-[var(--glass)] flex items-center justify-center text-fg-subtle hover:text-fg transition-colors"
-              title="Rename chat"
-              @click.stop="renameChat(chat.id)"
-            >
-              <UIcon name="i-heroicons-pencil-16-solid" />
-            </button>
-            <button
-              class="size-8 rounded-lg hover:bg-red-500/10 flex items-center justify-center text-fg-subtle hover:text-red-400 transition-colors"
-              title="Delete chat"
-              @click.stop="deleteChat(chat.id)"
-            >
-              <UIcon name="i-heroicons-trash-16-solid" />
-            </button>
-          </div>
-        </div>
-      </div>
+    <!-- Error State -->
+    <div v-else-if="error" class="panel p-6 text-center">
+      <UIcon name="i-heroicons-exclamation-triangle-20-solid" class="text-4xl text-red-400 mx-auto" />
+      <p class="text-fg mt-2">
+        {{ error }}
+      </p>
+      <button class="chip-accent px-4 py-2 mt-4 rounded-lg" @click="fetchChats">
+        Try Again
+      </button>
     </div>
 
     <!-- Empty State -->
-    <div
-      v-else
-      class="panel shadow-soft p-12 text-center"
-    >
-      <UIcon name="i-heroicons-chat-bubble-left-right-20-solid" class="text-5xl text-fg-subtle mx-auto mb-4" />
-      <h3 class="text-lg font-semibold text-fg mb-2">
-        No chats yet
-      </h3>
-      <p class="text-sm text-fg-muted mb-6">
-        Start a conversation to see your chats here
+    <div v-else-if="filteredChats.length === 0" class="panel p-12 text-center">
+      <UIcon name="i-heroicons-chat-bubble-left-right-20-solid" class="text-6xl text-fg-subtle mx-auto" />
+      <h2 class="text-xl font-semibold text-fg mt-4">
+        {{ searchQuery ? 'No chats found' : 'No chats yet' }}
+      </h2>
+      <p class="text-fg-muted mt-2">
+        {{ searchQuery ? 'Try adjusting your search or filters' : 'Start a new conversation to get started' }}
       </p>
-      <UButton
-        color="emerald"
-        size="lg"
-        class="rounded-xl"
-        icon="i-heroicons-plus-20-solid"
-        @click="onNew"
+      <NuxtLink v-if="!searchQuery" to="/ai-chat/new" class="chip-accent px-6 py-3 mt-6 rounded-lg inline-block">
+        <UIcon name="i-heroicons-plus-20-solid" class="mr-2" />
+        Create Your First Chat
+      </NuxtLink>
+    </div>
+
+    <!-- Chat List -->
+    <div v-else class="grid gap-4">
+      <div
+        v-for="chat in filteredChats"
+        :key="chat.id"
+        class="panel p-4 hover:shadow-lg transition-all group relative"
       >
-        Start Your First Chat
-      </UButton>
+        <NuxtLink
+          :to="getChatLink(chat)"
+          class="block"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <!-- Title and Date -->
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <h3 class="text-lg font-semibold text-fg truncate group-hover:text-emerald-400 transition-colors">
+                  {{ chat.title }}
+                </h3>
+                <span class="text-xs text-fg-muted whitespace-nowrap">
+                  {{ formatDate(chat.updatedAt) }}
+                </span>
+              </div>
+
+              <!-- Provider Badge and Model -->
+              <div class="flex items-center gap-2 mb-2">
+                <UBadge :color="getProviderColor(chat.provider)" variant="soft" size="sm">
+                  {{ chat.provider }}
+                </UBadge>
+                <span class="text-xs text-fg-muted">
+                  {{ chat.model }}
+                </span>
+                <span class="text-xs text-fg-subtle">
+                  • {{ chat.messageCount }} messages
+                </span>
+              </div>
+
+              <!-- Last Message Preview -->
+              <p v-if="chat.lastMessage" class="text-sm text-fg-muted line-clamp-2">
+                <span class="font-medium">{{ chat.lastMessage.role === 'user' ? 'You:' : 'AI:' }}</span>
+                {{ chat.lastMessage.content }}
+              </p>
+              <p v-else class="text-sm text-fg-subtle italic">
+                No messages yet
+              </p>
+            </div>
+          </div>
+        </NuxtLink>
+
+        <!-- Delete Button -->
+        <button
+          class="absolute top-4 right-4 chip px-3 py-1 text-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          @click.prevent="deleteChat(chat.id, chat.title)"
+        >
+          <UIcon name="i-heroicons-trash-20-solid" />
+        </button>
+      </div>
     </div>
   </div>
-
-  <UModal v-model="renameState.open" :ui="{ width: 'max-w-md' }">
-    <UCard>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h3 class="text-base font-semibold text-fg">
-            Rename Chat
-          </h3>
-        </div>
-      </template>
-      <UFormGroup label="Chat title" :error="renameState.error">
-        <UInput
-          v-model="renameState.title"
-          placeholder="Enter new title"
-          autofocus
-          @keydown.enter.prevent="submitRename"
-        />
-      </UFormGroup>
-      <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <UButton variant="ghost" @click="cancelRename">
-            Cancel
-          </UButton>
-          <UButton color="emerald" @click="submitRename">
-            Save
-          </UButton>
-        </div>
-      </template>
-    </UCard>
-  </UModal>
-
-  <UModal v-model="deleteState.open" :ui="{ width: 'max-w-md' }">
-    <UCard>
-      <template #header>
-        <h3 class="text-base font-semibold text-fg">
-          Delete Chat
-        </h3>
-      </template>
-      <p class="text-sm text-fg-muted">
-        Are you sure you want to delete <span class="font-medium text-fg">{{ deleteState.title }}</span>? This action
-        cannot be undone.
-      </p>
-      <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <UButton variant="ghost" @click="cancelDelete">
-            Cancel
-          </UButton>
-          <UButton color="red" @click="confirmDelete">
-            Delete
-          </UButton>
-        </div>
-      </template>
-    </UCard>
-  </UModal>
 </template>

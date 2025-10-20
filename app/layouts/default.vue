@@ -18,7 +18,7 @@ const allItems = ref<Readonly<NavigationMenuItem[]>>([
   {
     label: 'AI Chat',
     icon: 'i-heroicons-sparkles-20-solid',
-    to: '/ai-chat',
+    to: '/ai-chat/new',
     requireAuth: true,
   },
   {

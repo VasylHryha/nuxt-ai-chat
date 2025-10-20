@@ -4,17 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Nuxt 4 AI Chat Starter** demonstrating secure multi-provider AI integration with JWT authentication and SQLite persistence. Built with Nuxt 4, Vue 3, Pinia, Bun, TypeScript, Tailwind v4, and Vercel AI SDK.
+This is a **Nuxt 4 AI Chat Starter** demonstrating secure multi-provider AI integration with JWT authentication, chat history management, and SQLite persistence. Built with Nuxt 4, Vue 3, Pinia, Bun, TypeScript, Tailwind v4, and Vercel AI SDK.
 
 **Core Philosophy**: Client only talks to Nuxt backend; backend handles all provider communication and persistence.
+
+**Key Features**:
+- ✅ Multi-provider AI chat (OpenAI, Anthropic, Google, OpenRouter)
+- ✅ Complete chat history system (create, store, resume, delete)
+- ✅ JWT authentication with Argon2 password hashing
+- ✅ Real-time message persistence to SQLite
+- ✅ Search and filter chats by provider, date, and content
 
 ## Essential Reading
 
 **BEFORE making ANY code changes**, read these docs in order:
 1. **[docs/AI_PLAYBOOK.md](./docs/AI_PLAYBOOK.md)** - MANDATORY work guidelines, patterns, and best practices
 2. **[docs/AI_AGENT_BRIEF.md](./docs/AI_AGENT_BRIEF.md)** - Detailed architecture and system design
-3. **[TODO.md](./TODO.md)** - Current priorities and tasks
-4. **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Quick reference for workflows
+3. **[CHAT_HISTORY_FEATURE.md](./CHAT_HISTORY_FEATURE.md)** - Chat history implementation guide
+4. **[docs/CHAT_HISTORY_ARCHITECTURE.md](./docs/CHAT_HISTORY_ARCHITECTURE.md)** - Detailed architecture diagrams
+5. **[TODO.md](./TODO.md)** - Current priorities and tasks
+6. **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Quick reference for workflows
 
 ## Development Commands
 
@@ -182,12 +191,18 @@ server/
 ├── api/v1/
 │   ├── ai/chats/index.post.ts       # AI SDK streaming (SSE)
 │   ├── auth/*.post.ts               # Login, signup, logout, me
-│   ├── chats/                       # List, sync chat data
+│   ├── chats/
+│   │   ├── index.get.ts             # List chats (with filters, message count, preview)
+│   │   ├── create.post.ts           # Create new chat
+│   │   ├── [chatId].get.ts          # Get chat with messages
+│   │   ├── [chatId].delete.ts       # Soft delete chat
+│   │   └── [chatId]/messages.post.ts # Add message to chat
 │   ├── users/index.get.ts           # User management
 │   └── {provider}/chat.post.ts      # Provider-specific endpoints
 ├── db/
 │   ├── main.ts                      # DB instance
 │   ├── users.ts, chats.ts           # Query helpers
+│   ├── messages.ts                  # Message CRUD operations
 │   └── connections.ts               # Connection queries
 ├── middleware/
 │   ├── 00.logs.ts                   # Request logging

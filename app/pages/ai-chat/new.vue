@@ -1,31 +1,10 @@
 <script setup lang="ts">
-import { Chat } from '@ai-sdk/vue'
-import { createIdGenerator, DefaultChatTransport } from 'ai'
-import { useAuth } from '@/stores/auth' // if you have one
+import { useAiChatSession } from '@/composables/useAiChatSession'
+import { getChatRouteFor } from '@/services/providers/routing'
 
-const auth = useAuth()
-
-// you can also wire these to a provider/model picker
-const provider = ref<'openai' | 'openrouter' | 'anthropic' | 'google'>('openai')
-const model = ref('gpt-5-nano') // or whatever you selected server-side
-
-const chat = new Chat({
-  generateId: createIdGenerator({ prefix: 'msgc', size: 16 }),
-  // tell the SDK where the chat API lives
-  transport: new DefaultChatTransport({
-    api: '/api/v1/ai/chats',
-
-    // include cookies (for httpOnly JWT) or auth header
-    credentials: 'include',
-
-    // add headers dynamically if you use Bearer tokens
-    headers: () => ({ Authorization: `Bearer ${auth.token}` }),
-    // only send the last message to the server:
-    prepareSendMessagesRequest({ messages, id }) {
-      return { body: { messages, id, provider: provider.value, model: model.value } }
-    },
-  }),
-
+const router = useRouter()
+const { chat, currentChatId, provider, model } = useAiChatSession({
+  onFirstChatCreated: (id) => router.replace(getChatRouteFor(provider.value, model.value, id)),
 })
 
 const input = ref('')
@@ -46,18 +25,35 @@ useHead({ title: 'AI Chat · Nuxt AI Chat' })
   <div class="flex flex-col h-[calc(100vh-12rem)] max-h-[800px]">
     <!-- Header -->
     <div class="flex items-center justify-between mb-4 pb-4 border-b border-[var(--panel-border)]">
-      <div>
-        <h1 class="text-2xl font-semibold text-fg">
-          AI Chat
-        </h1>
-        <p class="text-sm text-fg-muted">
-          Chat with AI using Vercel AI SDK
-        </p>
+      <div class="flex items-center gap-3">
+        <NuxtLink
+          to="/chats"
+          class="text-fg-muted hover:text-fg transition-colors"
+        >
+          <UIcon name="i-heroicons-arrow-left-20-solid" class="text-xl" />
+        </NuxtLink>
+        <div>
+          <h1 class="text-2xl font-semibold text-fg">
+            AI Chat
+          </h1>
+          <p class="text-sm text-fg-muted">
+            {{ currentChatId ? 'Continue conversation' : 'Start a new conversation' }}
+          </p>
+        </div>
       </div>
-      <UBadge color="emerald" variant="soft" size="md" class="rounded-lg">
-        <UIcon name="i-heroicons-sparkles-20-solid" class="mr-1" />
-        AI SDK
-      </UBadge>
+      <div class="flex items-center gap-2">
+        <NuxtLink
+          to="/ai-chat/new"
+          class="chip px-3 py-2 text-sm"
+        >
+          <UIcon name="i-heroicons-plus-20-solid" class="mr-1" />
+          New Chat
+        </NuxtLink>
+        <UBadge color="emerald" variant="soft" size="md" class="rounded-lg">
+          <UIcon name="i-heroicons-sparkles-20-solid" class="mr-1" />
+          AI SDK
+        </UBadge>
+      </div>
     </div>
 
     <!-- Messages Container -->

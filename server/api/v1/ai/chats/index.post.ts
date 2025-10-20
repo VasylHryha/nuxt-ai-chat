@@ -4,7 +4,7 @@ import { convertToModelMessages, streamText } from 'ai'
 
 export default defineLazyEventHandler(async () => {
   const apiKey = useRuntimeConfig().openaiApiKey
-  const model = useRuntimeConfig().openaiModel
+  const defaultModel = useRuntimeConfig().public.openaiModel
   if (!apiKey)
     throw new Error('Missing OpenAI API key')
   const openai = createOpenAI({
@@ -12,7 +12,13 @@ export default defineLazyEventHandler(async () => {
   })
 
   return defineEventHandler(async (event: any) => {
-    const { messages }: { messages: UIMessage[] } = await readBody(event)
+    const { messages, model: requestModel }: { messages: UIMessage[], model?: string } = await readBody(event)
+
+    // Use model from request, fallback to config
+    const model = requestModel || defaultModel
+
+    console.log('Using model:', model)
+    console.log('Messages count:', messages.length)
 
     const result = streamText({
       model: openai(model),

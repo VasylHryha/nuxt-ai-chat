@@ -8,6 +8,7 @@ const ACCESS_COOKIE = 'access_token'
 export function getTokenFromRequest(event: H3Event) {
   // Prefer Authorization header; fallback to cookie
   const auth = getHeader(event, 'authorization') || ''
+  console.log(222, auth)
   if (auth.startsWith('Bearer '))
     return auth.slice(7).trim()
   const cookie = getCookie(event, ACCESS_COOKIE)

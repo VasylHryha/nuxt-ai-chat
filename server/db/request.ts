@@ -1,6 +1,6 @@
+// server/db/request.ts
 import type { H3Event } from 'h3'
 import { createError, getHeader } from 'h3'
-
 import db from './main'
 
 export function getEmailFromRequest(event: H3Event): string | null {
@@ -12,7 +12,7 @@ export function getUserFromRequest(event: H3Event) {
   const email = getEmailFromRequest(event)
   if (!email)
     return null
-  const stmt = db.query(`SELECT * FROM users WHERE email = ?`)
+  const stmt = db.prepare(`SELECT * FROM users WHERE email = ?`)
   const user = stmt.get(email) as any | undefined
   return user ?? null
 }

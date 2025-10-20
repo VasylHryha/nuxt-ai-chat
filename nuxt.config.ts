@@ -1,13 +1,9 @@
 import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
-import { defineNuxtConfig } from 'nuxt/config'
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
-  nitro: {
-    preset: 'bun', // build for Bun runtime
-  },
 
   modules: [
     '@nuxt/ui',
@@ -16,6 +12,7 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
     '@nuxt/fonts',
     '@nuxtjs/color-mode', // ensure <html class="dark"> for Tailwind v4 @variant dark
+    'nuxt-ssr-api-logger',
   ],
 
   colorMode: {
@@ -64,6 +61,7 @@ export default defineNuxtConfig({
     openrouterApiKey: '',
     openaiApiKey: '',
     jwtSecret: '',
+    dbPath: '',
     public: {
       openrouterBase: 'https://openrouter.ai/api/v1',
       openrouterModel: 'deepseek/deepseek-r1:free',

@@ -527,6 +527,143 @@ See [docs/AI_AGENT_BRIEF.md](./docs/AI_AGENT_BRIEF.md) for full feature roadmap.
 
 ---
 
+## 🔐 Auth Enhancement: Phase 4 (Future Work)
+
+These are deferred auth improvements to implement after core features are stable:
+
+### Phase 4.1: Enhanced Redirect Flow
+**Effort**: ~30 minutes | **Impact**: Medium (UX)
+
+**Current**: Basic redirect with `?redirect=` query param
+**Enhancement**:
+- Preserve full query params during redirect (not just path)
+- Handle redirect loops (max 3 redirects)
+- Support deep-linking to specific chat/message
+
+**Files to modify**:
+- `app/middleware/auth.global.ts`
+- `app/pages/chats/login.vue`
+
+**Implementation**:
+```typescript
+// Preserve full query params
+return navigateTo({
+  path: '/chats/login',
+  query: {
+    redirect: to.fullPath,
+    ...to.query // preserve existing query
+  },
+})
+```
+
+---
+
+### Phase 4.2: Loading Skeleton During Auth Check
+**Effort**: ~1 hour | **Impact**: Medium (UX)
+
+**Current**: No visual feedback during initial auth check
+**Enhancement**:
+- Show skeleton loader while `auth.isInitialized === false`
+- Add suspense boundary for protected routes
+- Smooth transition after auth check completes
+
+**Files to create/modify**:
+- `app/components/AuthSkeleton.vue` (new)
+- `app/layouts/default.vue` (add skeleton)
+- `app/plugins/auth-hydration.client.ts` (expose loading state)
+
+**Implementation**:
+```vue
+<template>
+  <div v-if="!auth.isInitialized" class="auth-loading">
+    <UIcon name="i-heroicons-arrow-path" class="animate-spin" />
+    <p>Loading...</p>
+  </div>
+  <slot v-else />
+</template>
+```
+
+---
+
+### Phase 4.3: Refresh Token Logic
+**Effort**: ~3-4 hours | **Impact**: High (Security & UX)
+
+**Current**: JWT expires after 7 days, requires re-login
+**Enhancement**:
+- Implement refresh token rotation
+- Auto-refresh before expiry (silent renewal)
+- Handle token expiry gracefully with modal/toast
+
+**Files to create/modify**:
+- `server/api/v1/auth/refresh.post.ts` (new endpoint)
+- `server/utils/jwt.ts` (add refresh token helpers)
+- `app/stores/auth.ts` (add refresh logic)
+- `app/plugins/auth-refresh.client.ts` (auto-refresh timer)
+
+**Database changes**:
+```sql
+CREATE TABLE refresh_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
+```
+
+**Implementation flow**:
+1. Login returns: `{ accessToken, refreshToken, expiresIn }`
+2. Store refreshToken in httpOnly cookie (longer TTL: 30 days)
+3. Client checks expiry before API calls
+4. If expiring soon (< 5 min), call `/auth/refresh`
+5. Server validates refreshToken → issues new accessToken
+6. Rotate refreshToken (invalidate old, issue new)
+
+**Benefits**:
+- Users stay logged in for 30 days (seamless UX)
+- Short-lived access tokens (7 days → 1 hour) improve security
+- Stolen access tokens expire quickly
+- Refresh token rotation prevents replay attacks
+
+---
+
+### Phase 4.4: Token Expiry Handling
+**Effort**: ~1 hour | **Impact**: Medium (UX)
+
+**Current**: 401 errors show generic error message
+**Enhancement**:
+- Detect token expiry from API responses
+- Show user-friendly modal: "Session expired, please log in"
+- Auto-redirect to login with return URL
+- Preserve unsaved work (draft messages)
+
+**Files to modify**:
+- `app/plugins/fetch-auth.client.ts` (add error interceptor)
+- `app/stores/auth.ts` (add session expired state)
+- Add global error handler
+
+**Implementation**:
+```typescript
+// Global $fetch wrapper
+const api = $fetch.create({
+  onResponseError({ response }) {
+    if (response.status === 401) {
+      auth.handleExpiredSession()
+      // Show modal or toast
+      toast.add({
+        title: 'Session expired',
+        description: 'Please log in again',
+        color: 'red'
+      })
+      navigateTo('/chats/login')
+    }
+  }
+})
+```
+
+---
+
 ## 💡 Future Enhancements (Beyond Polish)
 
 These go beyond code quality into new capabilities:
@@ -544,5 +681,5 @@ These go beyond code quality into new capabilities:
 
 ---
 
-**Last updated**: 2025-01-17
+**Last updated**: 2025-10-17
 **Status**: Ready for focused polish sprints

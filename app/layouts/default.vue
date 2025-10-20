@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
+import { storeToRefs } from 'pinia'
+import { useAuth } from '@/stores/auth'
 
 const year = new Date().getFullYear()
+const auth = useAuth()
+const { user, isLoading } = storeToRefs(auth)
+const route = useRoute()
 
-const items = ref<NavigationMenuItem[]>([
+// All navigation items (some require auth)
+const allItems = ref<Readonly<NavigationMenuItem[]>>([
   {
     label: 'Home',
     icon: 'i-heroicons-home-20-solid',
@@ -13,18 +19,35 @@ const items = ref<NavigationMenuItem[]>([
     label: 'AI Chat',
     icon: 'i-heroicons-sparkles-20-solid',
     to: '/ai-chat',
+    requireAuth: true,
   },
   {
     label: 'Chats',
     icon: 'i-heroicons-chat-bubble-left-right-20-solid',
     to: '/chats',
+    requireAuth: true,
   },
   {
     label: 'Users',
     icon: 'i-heroicons-users-20-solid',
     to: '/users',
+    requireAuth: true,
   },
 ])
+
+// Filter navigation based on auth state
+const items = computed(() => {
+  if (!user.value) {
+    // Show only public items when not authenticated
+    return allItems.value.filter(item => !item.requireAuth)
+  }
+  return allItems.value
+})
+
+async function handleLogout() {
+  await auth.logout()
+  navigateTo('/chats/login')
+}
 </script>
 
 <template>
@@ -81,6 +104,37 @@ const items = ref<NavigationMenuItem[]>([
               aria-label="Open menu"
             />
           </UDropdownMenu>
+
+          <!-- User info & logout (when authenticated) -->
+          <div v-if="user" class="flex items-center gap-2">
+            <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--glass)] border border-[var(--panel-border)]">
+              <UIcon name="i-heroicons-user-circle-16-solid" class="text-fg-subtle" />
+              <span class="text-sm text-fg-muted">{{ user.email }}</span>
+            </div>
+            <UButton
+              icon="i-heroicons-arrow-right-on-rectangle-16-solid"
+              color="neutral"
+              variant="ghost"
+              class="rounded-xl"
+              title="Logout"
+              :disabled="isLoading"
+              @click="handleLogout"
+            >
+              <span class="hidden sm:inline">Logout</span>
+            </UButton>
+          </div>
+
+          <!-- Login button (when not authenticated) -->
+          <UButton
+            v-else-if="route.path !== '/chats/login'"
+            to="/chats/login"
+            color="emerald"
+            variant="soft"
+            class="rounded-xl"
+            icon="i-heroicons-arrow-right-on-rectangle-16-solid"
+          >
+            Login
+          </UButton>
 
           <!-- Theme switcher -->
           <UColorModeButton class="rounded-xl" />

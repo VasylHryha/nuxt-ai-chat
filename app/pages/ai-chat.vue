@@ -1,14 +1,41 @@
 <script setup lang="ts">
 import { Chat } from '@ai-sdk/vue'
+import { createIdGenerator, DefaultChatTransport } from 'ai'
+import { useAuth } from '@/stores/auth' // if you have one
+
+const auth = useAuth()
+
+// you can also wire these to a provider/model picker
+const provider = ref<'openai' | 'openrouter' | 'anthropic' | 'google'>('openai')
+const model = ref('gpt-5-nano') // or whatever you selected server-side
+
+const chat = new Chat({
+  generateId: createIdGenerator({ prefix: 'msgc', size: 16 }),
+  // tell the SDK where the chat API lives
+  transport: new DefaultChatTransport({
+    api: '/api/v1/ai/chats',
+
+    // include cookies (for httpOnly JWT) or auth header
+    credentials: 'include',
+
+    // add headers dynamically if you use Bearer tokens
+    headers: () => ({ Authorization: `Bearer ${auth.token}` }),
+    // only send the last message to the server:
+    prepareSendMessagesRequest({ messages, id }) {
+      return { body: { messages, id, provider: provider.value, model: model.value } }
+    },
+  }),
+
+})
 
 const input = ref('')
-const chat = new Chat({})
 
 function handleSubmit(e: Event) {
   e.preventDefault()
-  if (!input.value.trim())
+  const text = input.value.trim()
+  if (!text)
     return
-  chat.sendMessage({ text: input.value })
+  chat.sendMessage({ text })
   input.value = ''
 }
 

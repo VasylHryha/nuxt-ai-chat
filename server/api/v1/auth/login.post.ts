@@ -1,6 +1,5 @@
 // server/api/v1/auth/login.post.ts
 import { getPasswordHashByEmail } from '@/server/db/users'
-import { isValidEmail } from '@/server/utils/validators'
 
 export default defineEventHandler(async (event) => {
   const { email, password } = await readBody<{ email: string, password: string }>(event)

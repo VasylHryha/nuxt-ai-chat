@@ -1,3 +1,4 @@
+// server/db/chats.ts
 import type { Chat } from 'db/types'
 import { getOrCreateConnection } from './connections'
 import db from './main'
@@ -29,12 +30,13 @@ export function createChatForUser(input: CreateChatInput): Chat {
   const id = rid('chat_')
   const now = Date.now()
   const title = (input.title || 'New chat').trim() || 'New chat'
-  db.query(`
-    INSERT INTO chats (id,user_id,connection_id,title,created_at,updated_at)
-    VALUES (?,?,?,?,?,?)
-  `).run(id, user.id, conn.id, title, now, now)
 
-  return db.query(`SELECT * FROM chats WHERE id = ?`).get(id) as Chat
+  db.prepare(`
+        INSERT INTO chats (id,user_id,connection_id,title,created_at,updated_at)
+        VALUES (?,?,?,?,?,?)
+    `).run(id, user.id, conn.id, title, now, now)
+
+  return db.prepare(`SELECT * FROM chats WHERE id = ?`).get(id) as Chat
 }
 
 export function listChatsByUserEmail(opts: { email: string, provider?: string, model?: string }): Array<Chat & { provider: string, model: string }> {
@@ -43,43 +45,43 @@ export function listChatsByUserEmail(opts: { email: string, provider?: string, m
     throw new Error('User not found')
 
   if (opts.provider && opts.model) {
-    const rows = db.query(`
-      SELECT c.*, k.provider, k.model
-      FROM chats c
-      JOIN connections k ON k.id = c.connection_id
-      WHERE c.user_id = ?
-        AND c.deleted_at IS NULL
-        AND k.deleted_at IS NULL
-        AND k.provider = ?
-        AND k.model = ?
-      ORDER BY c.updated_at DESC
-    `).all(user.id, opts.provider.trim().toLowerCase(), opts.model.trim()) as any[]
+    const rows = db.prepare(`
+            SELECT c.*, k.provider, k.model
+            FROM chats c
+                     JOIN connections k ON k.id = c.connection_id
+            WHERE c.user_id = ?
+              AND c.deleted_at IS NULL
+              AND k.deleted_at IS NULL
+              AND k.provider = ?
+              AND k.model = ?
+            ORDER BY c.updated_at DESC
+        `).all(user.id, opts.provider.trim().toLowerCase(), opts.model.trim()) as any[]
     return rows
   }
 
   if (opts.provider) {
-    const rows = db.query(`
-      SELECT c.*, k.provider, k.model
-      FROM chats c
-      JOIN connections k ON k.id = c.connection_id
-      WHERE c.user_id = ?
-        AND c.deleted_at IS NULL
-        AND k.deleted_at IS NULL
-        AND k.provider = ?
-      ORDER BY c.updated_at DESC
-    `).all(user.id, opts.provider.trim().toLowerCase()) as any[]
+    const rows = db.prepare(`
+            SELECT c.*, k.provider, k.model
+            FROM chats c
+                     JOIN connections k ON k.id = c.connection_id
+            WHERE c.user_id = ?
+              AND c.deleted_at IS NULL
+              AND k.deleted_at IS NULL
+              AND k.provider = ?
+            ORDER BY c.updated_at DESC
+        `).all(user.id, opts.provider.trim().toLowerCase()) as any[]
     return rows
   }
 
-  const rows = db.query(`
-    SELECT c.*, k.provider, k.model
-    FROM chats c
-    JOIN connections k ON k.id = c.connection_id
-    WHERE c.user_id = ?
-      AND c.deleted_at IS NULL
-      AND k.deleted_at IS NULL
-    ORDER BY c.updated_at DESC
-  `).all(user.id) as any[]
+  const rows = db.prepare(`
+        SELECT c.*, k.provider, k.model
+        FROM chats c
+                 JOIN connections k ON k.id = c.connection_id
+        WHERE c.user_id = ?
+          AND c.deleted_at IS NULL
+          AND k.deleted_at IS NULL
+        ORDER BY c.updated_at DESC
+    `).all(user.id) as any[]
 
   return rows
 }

@@ -260,7 +260,12 @@ This starter is designed to evolve. Potential enhancements:
 
 ## Documentation
 
-- **Architecture Guide**: [docs/AI_AGENT_BRIEF.md](./docs/AI_AGENT_BRIEF.md)
+### 📚 For Developers & AI Assistants
+- **🤖 AI Collaboration Playbook**: [docs/AI_PLAYBOOK.md](./docs/AI_PLAYBOOK.md) - **START HERE!** Essential rules for working on this project
+- **🏗️ Architecture Guide**: [docs/AI_AGENT_BRIEF.md](./docs/AI_AGENT_BRIEF.md) - System design and patterns
+- **✅ TODO & Priorities**: [TODO.md](./TODO.md) - Current tasks and roadmap
+
+### 🔗 External Resources
 - **Nuxt Documentation**: https://nuxt.com/docs
 - **Vercel AI SDK**: https://sdk.vercel.ai/docs
 - **Pinia Store**: https://pinia.vuejs.org/

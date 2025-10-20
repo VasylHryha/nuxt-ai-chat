@@ -1,191 +1,535 @@
-# Nuxt AI Chat - Agent Brief
+# Nuxt AI Chat - Architecture Brief
 
-## Mission Snapshot
-- Goal: ship a Nuxt 4 starter that demonstrates secure, proxy-based AI chat (DeepSeek via OpenRouter first, OpenAI-ready).
-- Stack: Nuxt 4 + Vue 3 (`<script setup>`), Pinia stores, Nuxt UI, Tailwind v4 tokens, Bun tooling, Bun/SQLite persistence on the server.
-- Core idea: client only talks to our Nuxt backend; the backend fans out to OpenRouter/OpenAI/etc. and optionally syncs chats to SQLite.
+**Last Updated**: 2025-10-17
 
-## Frontend Architecture
-- Layout shell in `app/layouts/default.vue` overlays Nuxt UI navigation + Tailwind theme tokens.
-- Landing page (`app/pages/index.vue`) markets the starter; DeepSeek chat lives in `app/pages/deep-seek.vue`.
-- Stores:
-  - `app/stores/chat.sessions.ts` keeps per-session Pinia state (messages, capped flags, char counts).
-  - `app/stores/chat.runtime.ts` handles runtime send flow: optimistic user message, provider dispatch, error/cancel handling.
-- Shared components under `app/components/` cover transcript, composer, quick prompts, caps alert; rely on Nuxt UI primitives.
-- Providers resolved through `app/composables/useChatProvider.ts` -> `app/services/providers/*` to keep chat APIs swappable.
+> **Quick Links**: [AI Playbook](./AI_PLAYBOOK.md) • [TODO](../TODO.md) • [Contributing](../CONTRIBUTING.md)
 
-## Backend Architecture
-- SQLite schema in `db/migrations/001_init.sql`; Bun scripts manage migrations/seeds (`bun run db:scripts`).
-- Low-level DB helpers in `server/db/*.ts` for users, chats, connections.
-- REST endpoints under `server/api/v1/`:
-  - `/openrouter/chat` posts to OpenRouter with runtime config credentials.
-  - `/openai/*` mirrors the same shape and keeps an in-memory directory snapshot (`server/utils/state/openaiDirectory.ts`).
-  - `/chats` and `/users` expose CRUD-like proxies onto the SQLite tables.
-  - `/sdk/chats/*` targets AI SDK streaming, but imports need cleanup before it works.
-- Provider utilities (`server/utils/ai.ts`) wrap `@ai-sdk/*` for streaming support.
+---
 
-## Current Working State (Updated Jan 2025)
+## Mission & Goals
 
-### ✅ Completed & Working
-- **AI SDK Integration**: Full AI SDK implementation with streaming support
-  - `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google` installed
-  - Server-side streaming via `/api/v1/ai/chats/[id]/messages.post.ts`
-  - Dynamic provider selection (openai, anthropic, google)
-  - SSE streaming with `text-delta` events
-- **Authentication System**: Complete JWT-based auth
-  - Login/signup endpoints (`/api/v1/auth/*`)
-  - Argon2 password hashing via `@node-rs/argon2`
-  - httpOnly cookies + Bearer token support
-  - Global auth middleware protecting all `/api/v1/*` routes
-  - Auth stores with login/logout/me actions
-- **Database & Persistence**:
-  - SQLite schema with users, connections, chats, messages tables
-  - Database helpers for CRUD operations
-  - Dual-layer persistence (localStorage + server sync)
-  - Conflict resolution with last-write-wins merge
-  - Background sync every 60s
-- **State Management**:
-  - Auth store (token, user)
-  - Users store (SWR cache with TTL)
-  - Chat sessions store (DirectorySnapshot with profiles)
-  - Chat runtime store (sending state, errors, abort control)
-- **Provider Architecture**:
-  - Client-side providers: `ai-openai`, `openai` (legacy)
-  - Server-side dynamic provider factory
-  - Composable-based provider resolution
+Build a production-ready Nuxt 4 starter demonstrating:
+- ✅ **Multi-provider AI chat** with streaming support (OpenAI, Anthropic, Google, OpenRouter)
+- ✅ **Secure authentication** with JWT + Argon2 password hashing
+- ✅ **Chat persistence** with dual-layer storage (localStorage + SQLite)
+- ✅ **Modern stack** with Nuxt 4, Vue 3, Pinia, Tailwind v4, Vercel AI SDK
+- ✅ **Extensible architecture** supporting three provider patterns (AI SDK, Proxy, Native)
 
-### 🔧 Recent Fixes (Applied)
-1. ✅ **Fixed `useChatProvider.ts`**:
-   - Added missing `import { computed } from 'vue'`
-   - Added missing `import { useChatSessions } from '@/stores/chat.sessions'`
-   - Changed default provider from `'nuxt'` to `'ai-openai'` (valid registry key)
-2. ✅ **Fixed `chat.sessions.ts` repository contract**:
-   - Store now properly handles `DirectorySnapshot` structure
-   - `hydrate()` extracts current profile from snapshot
-   - `persist()` builds proper `DirectorySnapshot` with profile wrapper
-   - Added `profileId` state for multi-profile support
-3. ✅ **Fixed `ChatMessage` type consistency**:
-   - `appendMessageAndApplyLimits()` now populates `updatedAt` from `createdAt` if missing
-   - Ensures all messages have required `updatedAt` field
+**Core Philosophy**: Client only talks to our Nuxt backend; backend handles provider communication and persistence.
 
-## Known Gaps & TODOs (Updated)
-1. ~~`app/composables/useChatProvider.ts` issues~~ → **FIXED**
-2. ~~`app/stores/chat.sessions.ts` repository contract mismatch~~ → **FIXED**
-3. ~~`ChatMessage` type `updatedAt` field missing~~ → **FIXED**
-4. **Provider endpoint routing**: Client providers call `/api/v1/ai/chat` but streaming is at `/api/v1/ai/chats/[id]/messages`
-   - Need to align client provider endpoints with server streaming API
-   - Consider adding multiplexer route or updating provider implementations
-5. **Legacy OpenAI endpoints**: `/api/v1/openai/chats.*` still exist alongside AI SDK endpoints
-   - Decide: deprecate legacy or keep for backwards compatibility
-6. **Testing**: Vitest suite expanding
-   - ✅ Coverage for JWT/password utils, auth middleware, provider payloads (incl. error propagation), auth API routes, chat list/proxy/streaming endpoints (SSE mocked + failure paths), `chatRepository` merge/persistence logic, database CRUD/constraints, multi-user isolation, and input validation failure paths
-   - Still need chat persistence conflict tests and multi-user authorization edge cases
-7. **User Management UI**: Backend ready, UI missing
-   - `/api/v1/users` endpoints exist and working
-   - Need UI to select/create users
-   - Need user picker modal in app shell
-8. **Chat Discovery UI**: Backend ready, UI incomplete
-   - Need chat list page to browse previous conversations
-   - Need "new chat" flow with provider/model selection
-   - Need ability to resume existing chats
-9. **Multi-provider UI**: Only OpenAI wired up in default session
-   - Anthropic and Google providers installed but not exposed in UI
-   - Need provider selection dropdown/modal
+---
 
-## Suggested Next Steps (priority order)
-1. **Align client-side providers with AI SDK streaming endpoints**
-   - Update `ai-openai.ts` to use `/api/v1/ai/chats/[id]/messages` instead of generic `/api/v1/ai/chat`
-   - Ensure provider send flow creates chat first, then streams messages
-2. **Build chat discovery UI**
-   - Create `/chats` page to list user's previous conversations
-   - Add "New Chat" button with provider/model selection
-   - Wire up chat resume functionality
-3. **Build user management UI**
-   - Add user selector dropdown in app header/sidebar
-   - Create "Create User" modal
-   - Persist selected user in auth store
-4. **Add provider selection UI**
-   - Provider picker modal (OpenAI, Anthropic, Google)
-   - Model dropdown based on selected provider
-   - Save connection preferences per user
-5. **Testing**
-   - Auth flow tests (login, signup, protected routes)
-   - AI SDK streaming endpoint tests
-   - Chat persistence and conflict resolution tests
-6. **Clean up legacy code**
-   - Decide on legacy `/api/v1/openai/*` endpoints (deprecate or keep)
-   - Remove unused provider files if any
-7. **Documentation**
-   - Document required env vars (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`)
-   - Add setup guide for database initialization
-   - Document authentication flow
+## Current State Summary (October 2025)
 
-## Tooling & Setup Notes
-- Install: `bun install` (keep `bun.lock` in sync).
-- Dev server: `bun run dev` (requires `.env` with keys; see `nuxt.config.ts` for names).
-- DB: `bun run db:migrate` (runs `db/scripts/migrate.js`), `bun run db/scripts/seeds.js you@example.com` to add a user.
-- Tests (once added): `bunx nuxt test`.
-- ESLint: `bunx eslint . --fix` respecting @antfu config (two spaces, single quotes, no semis).
+### ✅ Fully Implemented
 
-## Provider Architecture Patterns
+#### 1. Authentication System
+- **JWT-based auth** with HS256, httpOnly cookies, Bearer token support
+- **Endpoints**: `/api/v1/auth/signup`, `/api/v1/auth/login`, `/api/v1/auth/logout`, `/api/v1/auth/me`
+- **Password security**: Argon2id hashing via `@node-rs/argon2`
+- **Middleware protection**:
+  - Server: `server/middleware/00.auth.ts` protects all `/api/v1/*` except `/api/v1/auth`
+  - Client: `app/middleware/auth.global.ts` protects routes except `/`, `/auth/login`, `/auth/signup`
+- **Stores**: `app/stores/auth.ts` with login/signup/logout/me + loading/error states
+- **Auto-hydration**: Plugin restores session from cookie on app start
+- **UI Integration**: Dynamic navigation, user display in header, logout button
 
-This project supports **three types of AI provider integration** to allow maximum flexibility:
+#### 2. AI Provider System
+**Three integration patterns** for maximum flexibility:
 
-### 1. **AI SDK Providers** (`type: 'ai-sdk'`)
-- Uses Vercel AI SDK (`@ai-sdk/*` packages) for streaming
-- Best for: streaming responses, structured outputs, tool calling
-- Example: `ai-openai` provider
-- Server endpoint: `/api/v1/ai/chats/[id]/messages` (streaming with SSE)
-- Benefits: Built-in streaming, multimodal support, standardized API
+**A. AI SDK Providers** (`type: 'ai-sdk'`)
+- Uses `@ai-sdk/vue` with Vercel AI SDK
+- Supports streaming via SSE
+- Current implementation: OpenAI via `/api/v1/ai/chats`
+- Example: `app/pages/ai-chat.vue` uses `new Chat()` from AI SDK
 
-### 2. **Proxy Providers** (`type: 'proxy'`)
-- Simple HTTP proxy to external AI services
-- Best for: third-party aggregators (OpenRouter), custom endpoints
-- Example: `openrouter`, `anthropic`, `google` providers
-- Server endpoint pattern: `/api/v1/{provider}/chat`
-- Benefits: Easy to add new providers, no SDK dependencies
-- **Generic factory available**: Use `createProxyProvider(key, endpoint)` to add new providers without creating files
+**B. Proxy Providers** (`type: 'proxy'`)
+- Simple HTTP proxy to external services
+- Generic factory: `createProxyProvider(key, endpoint)`
+- Examples: OpenRouter, custom endpoints
+- Pattern: `/api/v1/{provider}/chat.post.ts`
 
-### 3. **Native Providers** (`type: 'native'`)
-- Direct integration with provider's SDK
-- Best for: provider-specific features, maximum control
-- Example: `openai` (native) using OpenAI SDK directly
-- Server endpoint pattern: `/api/v1/{provider}/chat`
-- Benefits: Full access to provider features, no abstraction overhead
+**C. Native Providers** (`type: 'native'`)
+- Direct SDK integration with full provider features
+- Example: `openai.native.ts` using OpenAI SDK directly
 
-### Adding a New Provider
+**Provider Registry**: `app/services/providers/index.ts` with metadata in `PROVIDER_INFO`
 
-**Option A: Use the generic proxy factory** (simplest):
-```ts
-// In app/services/providers/index.ts registry
-'my-provider': () => createProxyProvider('my-provider', 'my-provider')
+**Extensibility**: Add new provider in 5 minutes with generic factory or custom adapter
+
+#### 3. Database & Persistence
+
+**Schema** (`db/migrations/001_init.sql`):
+- `users` - User accounts (id, email, name, created_at)
+- `credentials` - Argon2 password hashes (user_id, password_hash)
+- `connections` - AI provider configs per user (provider, model, api_key, settings)
+- `chats` - Conversation threads (user_id, connection_id, title, provider, model)
+- `messages` - Message history (chat_id, role, content, reasoning, timestamps)
+
+**Dual-layer persistence**:
+- **Primary**: localStorage (fast, offline-first)
+- **Secondary**: SQLite via `/api/v1/chats` (sync, multi-device)
+- **Conflict resolution**: Last-write-wins merge on `updatedAt` timestamps
+- **Background sync**: Every 60 seconds via `chatRepository.startBackgroundSync()`
+
+**Repository pattern**: `app/services/chatRepository.ts` handles load/save/sync
+
+#### 4. State Management (Pinia)
+
+**Auth Store** (`app/stores/auth.ts`):
+- State: `user`, `token`, `isLoading`, `isInitialized`, `errorMessage`
+- Actions: `login(email, password)`, `signup(name, email, password)`, `logout()`, `me()`
+
+**Users Store** (`app/stores/users.ts`):
+- SWR caching with 1-minute TTL
+- Actions: `ensure()`, `fetchAll()`, `addUser(email, name)`
+
+**Chat Sessions Store** (`app/stores/chat.sessions.ts`):
+- Manages `DirectorySnapshot` with profiles
+- Actions: `hydrate()`, `persist()`, `createNewSession()`, `pushMessageToCurrent()`
+
+**Chat Runtime Store** (`app/stores/chat.runtime.ts`):
+- UI state: `isSending`, `errorMessage`, `abortSignal`
+- Action: `send()` handles optimistic updates + provider dispatch
+
+#### 5. UI Components & Pages
+
+**Pages**:
+- `/` - Landing page (public)
+- `/auth/login` - Login form (public)
+- `/auth/signup` - Signup form (public)
+- `/ai-chat` - AI SDK chat interface (protected)
+- `/chats` - Chat list dashboard with stats (protected)
+- `/users` - User management (protected)
+
+**Layout** (`app/layouts/default.vue`):
+- Dynamic navigation based on auth state
+- User email display + logout button
+- Login button when not authenticated
+- Theme switcher (dark/light)
+
+**Styling**:
+- Tailwind v4 with custom CSS tokens (`app/assets/main.css`)
+- Nuxt UI components throughout
+- Theme-aware colors (`.text-fg`, `.text-fg-muted`, `.panel`, etc.)
+- Emerald accent color system
+
+#### 6. Testing Infrastructure
+
+**Framework**: Vitest with in-memory SQLite
+
+**Current Coverage** (7 test files, ~40 tests):
+- ✅ JWT utils (sign/verify/tamper/expiry)
+- ✅ Password utils (Argon2 hashing)
+- ✅ Auth middleware (public routes, token validation)
+- ✅ Provider adapters (payload structure, factory pattern)
+- ✅ Auth API routes (signup/login/me/logout flows)
+- ✅ Chat API (list, create, SSE streaming)
+- ✅ Chat repository (conflict resolution, sync)
+
+**Test Setup**: `tests/setup/test-env.ts` with DB reset, network mocks, auth helpers
+
+---
+
+## Architecture Patterns
+
+### Provider Architecture (3 Types)
+
+#### Type 1: AI SDK Provider
+```typescript
+// app/pages/ai-chat.vue
+import { Chat } from '@ai-sdk/vue'
+
+const chat = new Chat({
+  transport: new DefaultChatTransport({
+    api: '/api/v1/ai/chats',
+    credentials: 'include',
+    headers: () => ({ Authorization: `Bearer ${auth.token}` }),
+  }),
+})
 ```
-Then create `/server/api/v1/my-provider/chat.post.ts` following the OpenRouter pattern.
 
-**Option B: Create a dedicated adapter** (for complex needs):
-1. Create `app/services/providers/my-provider.ts`
-2. Implement `ProviderAdapter` interface with `key`, `type`, and `chat.send()`
-3. Add to registry in `app/services/providers/index.ts`
-4. Add metadata to `PROVIDER_INFO` for UI display
+Server handles streaming via SSE at `/api/v1/ai/chats`.
 
-### Provider Response Format
-All providers must return:
-```ts
-{
-  content: string        // Required: main response text
-  reasoning?: string     // Optional: for reasoning models (DeepSeek R1, etc.)
-  provider?: string      // Optional: provider identifier
-  model?: string         // Optional: model used
+#### Type 2: Proxy Provider
+```typescript
+// app/services/providers/index.ts
+'openrouter': () => createProxyProvider('openrouter', 'openrouter')
+
+// server/api/v1/openrouter/chat.post.ts
+export default defineEventHandler(async (event) => {
+  const { messages, model } = await readBody(event)
+  const { openrouterApiKey } = useRuntimeConfig()
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${openrouterApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ messages, model })
+  })
+
+  const data = await response.json()
+  return { content: data.choices[0].message.content, provider: 'openrouter', model }
+})
+```
+
+#### Type 3: Native Provider
+```typescript
+// app/services/providers/openai.native.ts
+import OpenAI from 'openai'
+
+export function openaiNativeProvider(): ProviderAdapter {
+  return {
+    key: 'openai',
+    type: 'native',
+    chat: {
+      async send({ messages, model, signal }) {
+        const client = new OpenAI({ apiKey: runtimeConfig.openaiApiKey })
+        const response = await client.chat.completions.create({
+          model: model || 'gpt-4o',
+          messages,
+        }, { signal })
+        return { content: response.choices[0].message.content, provider: 'openai', model }
+      }
+    }
+  }
 }
 ```
 
-## Key File References
-- **Pinia stores**: `app/stores/chat.runtime.ts`, `app/stores/chat.sessions.ts`, `app/stores/auth.ts`, `app/stores/users.ts`
-- **Provider system**: `app/services/providers/index.ts` (registry + factory), `app/services/providers/types.ts` (interfaces)
-- **Chat repository**: `app/services/chatRepository.ts` (dual-layer persistence with conflict resolution)
-- **Server AI SDK**: `server/api/v1/ai/chats/[id]/messages.post.ts` (streaming), `server/utils/ai.ts` (provider factory)
-- **Server proxies**: `server/api/v1/openrouter/chat.post.ts`, `server/api/v1/openai/chat.post.ts`
-- **DB helpers**: `server/db/chats.ts`, `server/db/connections.ts`, `server/db/users.ts`
-- **Auth**: `server/api/v1/auth/*`, `server/utils/auth.ts`, `server/utils/jwt.ts`
+### Repository Pattern
 
-Keep this brief updated after each meaningful change so subsequent agents and humans stay aligned.
+**Separation of concerns**:
+- **Repositories** (`app/services/*Repository.ts`): Pure I/O, no state
+- **Stores** (`app/stores/*.ts`): State + orchestration, use repositories
+- **Composables** (`app/composables/*.ts`): Reusable logic, use stores
+
+```typescript
+// ✅ Good: Repository handles I/O only
+export const chatRepository = {
+  async load(): Promise<DirectorySnapshot> {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : { currentProfileId: '', profiles: {} }
+  },
+  async save(snapshot: DirectorySnapshot): Promise<void> {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
+  }
+}
+
+// ✅ Good: Store orchestrates using repository
+export const useChatSessions = defineStore('chat.sessions', () => {
+  const sessions = ref<Record<string, Session>>({})
+
+  async function hydrate() {
+    const snapshot = await chatRepository.load()  // Use repo
+    // ... process snapshot into sessions
+  }
+
+  function persist() {
+    chatRepository.save(getSnapshot())  // Use repo
+  }
+
+  return { sessions, hydrate, persist }
+})
+```
+
+### Auth Middleware (Dual-Layer Protection)
+
+**Server-side** (`server/middleware/00.auth.ts`):
+- Runs on EVERY API request
+- Whitelists: `/api/v1/auth`, `/api/_nuxt_icon`, `/favicon.ico`
+- Verifies JWT from cookie or Bearer header
+- Attaches `event.context.user` for handlers to use
+
+**Client-side** (`app/middleware/auth.global.ts`):
+- Runs on EVERY route navigation
+- Whitelists: `/`, `/auth/login`, `/auth/signup`
+- Checks `auth.user` exists
+- Redirects to login with `?redirect={fullPath}` if not authenticated
+
+### Nuxt Auto-Imports (Important!)
+
+**DO NOT manually import these** - Nuxt auto-imports them:
+
+**Server-side**:
+- `server/utils/*.ts` → All exports globally available
+- Examples: `hashPassword()`, `signJWT()`, `verifyJWT()`, `setAccessCookie()`
+
+**Client-side**:
+- `composables/*.ts` → Functions starting with `use`
+- `stores/*.ts` → Pinia stores (via `useStoreName()`)
+- `components/*.vue` → Vue components (no import in templates)
+
+```typescript
+// ✅ Good: Let Nuxt auto-import
+export default defineEventHandler(async (event) => {
+  const hash = await hashPassword('password')  // Auto-imported!
+  const token = signJWT(payload, options)       // Auto-imported!
+  return { hash, token }
+})
+
+// ❌ Bad: Manual imports (causes issues)
+import { hashPassword } from '@/server/utils/password'  // NOT NEEDED!
+import { signJWT } from '@/server/utils/jwt'            // NOT NEEDED!
+```
+
+**When you DO need imports**:
+- Database functions (from `server/db/*.ts`)
+- Types and interfaces
+- Third-party packages
+
+---
+
+## File Organization
+
+```
+app/
+├── assets/
+│   └── main.css               # Tailwind v4 + CSS tokens
+├── components/                # Vue components
+├── composables/               # Reusable logic (auto-imported)
+│   └── useChatProvider.ts    # Provider resolution
+├── layouts/
+│   └── default.vue           # App shell with nav
+├── middleware/
+│   └── auth.global.ts        # Client-side route guard
+├── pages/
+│   ├── index.vue             # Landing page
+│   ├── ai-chat.vue           # AI SDK chat
+│   ├── chats/
+│   │   ├── index.vue         # Chat list dashboard
+│   │   └── login.vue         # Login form (will move to auth/)
+│   ├── auth/
+│   │   ├── login.vue         # Login page
+│   │   └── signup.vue        # Signup page
+│   └── users.vue             # User management
+├── plugins/
+│   └── auth-hydration.client.ts  # Auto-restore session
+├── services/
+│   ├── providers/            # AI provider adapters
+│   │   ├── index.ts          # Registry + factory
+│   │   ├── types.ts          # Interfaces
+│   │   ├── ai-openai.ts      # AI SDK OpenAI
+│   │   ├── openai.native.ts  # Native OpenAI
+│   │   └── openrouter.ts     # Proxy OpenRouter
+│   ├── chatRepository.ts     # Chat persistence
+│   ├── usersRepository.ts    # User data access
+│   └── limits.ts             # Message limits
+└── stores/
+    ├── auth.ts               # Auth state
+    ├── users.ts              # User list (SWR)
+    ├── chat.sessions.ts      # Chat sessions
+    └── chat.runtime.ts       # Chat UI state
+
+server/
+├── api/v1/
+│   ├── ai/
+│   │   └── chats/
+│   │       └── index.post.ts  # AI SDK streaming endpoint
+│   ├── auth/
+│   │   ├── login.post.ts     # Login
+│   │   ├── signup.post.ts    # Signup
+│   │   ├── logout.post.ts    # Logout
+│   │   └── me.get.ts         # Get current user
+│   ├── chats/
+│   │   ├── index.get.ts      # List user chats
+│   │   └── index.put.ts      # Sync chat snapshot
+│   ├── users/
+│   │   └── index.get.ts      # List users
+│   ├── openrouter/
+│   │   └── chat.post.ts      # OpenRouter proxy
+│   └── openai/
+│       └── chat.post.ts      # OpenAI proxy
+├── db/
+│   ├── main.ts               # DB instance
+│   ├── chats.ts              # Chat queries
+│   ├── connections.ts        # Connection queries
+│   └── users.ts              # User queries
+├── middleware/
+│   └── 00.auth.ts            # Server-side auth guard
+└── utils/
+    ├── auth.ts               # Auth helpers (auto-imported)
+    ├── jwt.ts                # JWT sign/verify (auto-imported)
+    ├── password.ts           # Argon2 hash/verify (auto-imported)
+    └── validators.ts         # Email validation (auto-imported)
+
+db/
+├── migrations/
+│   └── 001_init.sql          # Database schema
+├── scripts/
+│   ├── migrate.js            # Migration runner
+│   └── seeds.js              # Seed test data
+└── types.ts                  # Database types
+
+docs/
+├── AI_AGENT_BRIEF.md         # This file
+├── AI_PLAYBOOK.md            # Work guidelines (READ FIRST!)
+└── api/                      # API documentation (TODO)
+
+tests/
+├── setup/
+│   └── test-env.ts           # Test utilities
+├── app/
+│   └── services/
+│       ├── chatRepository.spec.ts
+│       └── providers.spec.ts
+└── server/
+    ├── api/
+    │   ├── auth.spec.ts
+    │   └── chats.spec.ts
+    ├── db/
+    │   ├── chats.spec.ts
+    │   └── users.spec.ts
+    ├── middleware/
+    │   └── auth.global.spec.ts
+    └── utils/
+        ├── jwt.spec.ts
+        └── password.spec.ts
+```
+
+---
+
+## Key Decisions & Rationale
+
+### Why Nuxt Auto-Imports?
+- **DX**: Less boilerplate, cleaner code
+- **Performance**: Tree-shakable, only imports what's used
+- **Consistency**: Same patterns throughout project
+- **Caveat**: Easy to forget they're auto-imported (documented in Playbook)
+
+### Why Dual-Layer Persistence?
+- **Offline-first**: localStorage works without network
+- **Multi-device**: SQLite sync enables cross-device access
+- **Conflict resolution**: Timestamps + merge logic handle concurrent edits
+- **Future**: Can add real-time sync with WebSockets
+
+### Why Three Provider Types?
+- **AI SDK**: Best for streaming, structured outputs, multimodal
+- **Proxy**: Easiest to add new providers (5-minute setup)
+- **Native**: Maximum control for provider-specific features
+- **Flexibility**: Choose the right tool for each provider
+
+### Why Client + Server Middleware?
+- **Defense in depth**: Two layers of protection
+- **Better UX**: Client redirect avoids failed API calls
+- **Security**: Server verification is source of truth
+- **Clear separation**: Client handles routing, server handles auth
+
+---
+
+## Environment Variables
+
+Required in `.env`:
+
+```bash
+# Database
+DATABASE_URL=./db/sqlite/dev.db
+
+# JWT Secret (generate with: openssl rand -base64 32)
+JWT_SECRET=your-secret-key-here
+
+# AI Provider Keys (add the ones you plan to use)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...
+OPENROUTER_API_KEY=sk-or-...
+```
+
+**Security**: Never commit `.env` to git. Use `.env.example` as template.
+
+---
+
+## Setup & Development
+
+```bash
+# Install dependencies
+bun install
+
+# Initialize database
+bun run db:migrate
+
+# Seed test user (password: "password")
+bun run db/scripts/seeds.js your-email@example.com
+
+# Start dev server
+bun run dev
+
+# Run tests
+bun test
+
+# Build for production
+bun run build
+```
+
+---
+
+## Known Issues & TODOs
+
+### High Priority
+1. **Password validation inconsistency**: Login requires password but validation only checks presence
+2. **Chat persistence**: DirectorySnapshot structure works but needs server-side implementation
+3. **Provider endpoint alignment**: AI SDK client uses different endpoint than legacy providers
+
+### Medium Priority
+4. **Error handling**: Some API endpoints return empty 400 responses (no error message)
+5. **Type safety**: A few `any` types remain in catch blocks
+6. **Input validation**: No Zod schemas yet (manual validation only)
+
+### Low Priority
+7. **Legacy cleanup**: Decide fate of `/api/v1/openai/chats.*` endpoints
+8. **Testing gaps**: Need more E2E tests for auth flows
+9. **Documentation**: API contracts not fully documented
+
+**For detailed tasks, see [TODO.md](../TODO.md)**
+
+---
+
+## Next Steps (Recommended Order)
+
+1. **Fix critical bugs** (P0 from TODO.md)
+   - Empty 400 responses
+   - Password validation
+
+2. **Complete auth flow** (P1 from TODO.md)
+   - Test signup/login end-to-end
+   - Verify middleware protection works
+   - Add better error messages
+
+3. **Improve UX** (P2 from TODO.md)
+   - Provider selection UI
+   - Model picker
+   - Chat history UI improvements
+
+4. **Add testing** (P3 from TODO.md)
+   - Auth E2E tests
+   - Provider integration tests
+   - UI component tests
+
+5. **Polish & optimize** (P4 from TODO.md)
+   - Input validation with Zod
+   - Rate limiting
+   - Performance optimizations
+
+---
+
+## Learning Resources
+
+### Internal Docs
+- **[AI Playbook](./AI_PLAYBOOK.md)** - Work guidelines, patterns, best practices
+- **[TODO](../TODO.md)** - Prioritized task list
+- **[Contributing](../CONTRIBUTING.md)** - Quick reference guide
+
+### External Docs
+- [Nuxt 4 Documentation](https://nuxt.com/docs)
+- [Vercel AI SDK](https://sdk.vercel.ai/docs)
+- [Pinia Documentation](https://pinia.vuejs.org/)
+- [Nuxt UI](https://ui.nuxt.com/)
+- [Tailwind CSS v4](https://tailwindcss.com/blog/tailwindcss-v4-alpha)
+
+---
+
+**Last updated**: 2025-10-17
+**Status**: Active development, auth working, chat UI functional, provider system extensible
+
+**Remember**: Read [AI_PLAYBOOK.md](./AI_PLAYBOOK.md) before making changes!

@@ -1,6 +1,4 @@
 import { listChatsByUserEmail } from '@/server/db/chats'
-import { requireUser } from '@/server/utils/auth'
-import { isValidEmail } from '@/server/utils/validators'
 
 export default defineEventHandler((event) => {
   const authUser = requireUser(event)
@@ -29,8 +27,8 @@ export default defineEventHandler((event) => {
     }))
   }
   catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Failed to list chats'
-    const code = msg.includes('User not found') ? 404 : 400
-    throw createError({ statusCode: code, statusMessage: msg })
+    const message = error instanceof Error ? error.message : 'Failed to list chats'
+    const code = message.includes('User not found') ? 404 : 400
+    throw createError({ statusCode: code, statusMessage: message })
   }
 })

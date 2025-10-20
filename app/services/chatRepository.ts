@@ -68,30 +68,29 @@ let syncTimer: any = null
 
 export const chatRepository = {
   async load(): Promise<DirectorySnapshot> {
-    // 1) Local first
+    // 1) Local first (primary storage for now)
     if (isBrowser()) {
       try {
         const raw = localStorage.getItem(STORAGE_KEY)
-        if (raw)
-          return JSON.parse(raw) as DirectorySnapshot
+        if (raw) {
+          const parsed = JSON.parse(raw) as DirectorySnapshot
+          // Ensure structure is valid
+          return {
+            currentProfileId: parsed.currentProfileId || '',
+            profiles: parsed.profiles || {},
+          }
+        }
       }
       catch {
       }
     }
-    // 2) Remote fallback
-    try {
-      const remote = await $fetch<DirectorySnapshot>('/api/v1/chats', { method: 'GET' })
-      if (isBrowser())
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(remote || { currentProfileId: '', profiles: {} }))
-      return remote || { currentProfileId: '', profiles: {} }
-    }
-    catch {
-      return { currentProfileId: '', profiles: {} }
-    }
+    // 2) Return empty snapshot - server sync will be implemented later
+    // For now, localStorage is the primary source of truth
+    return { currentProfileId: '', profiles: {} }
   },
 
   async save(snapshot: DirectorySnapshot) {
-    // Local cache
+    // Local cache (primary storage)
     if (isBrowser()) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
@@ -99,16 +98,8 @@ export const chatRepository = {
       catch {
       }
     }
-    // Debounced push
-    if (pushTimer)
-      clearTimeout(pushTimer)
-    pushTimer = setTimeout(async () => {
-      try {
-        await $fetch('/api/v1/chats', { method: 'PUT', body: snapshot })
-      }
-      catch {
-      }
-    }, 600) // debounce 600ms
+    // TODO: Implement server sync when backend supports DirectorySnapshot structure
+    // For now, localStorage is sufficient for single-user/demo mode
   },
 
   async syncPull(local: DirectorySnapshot): Promise<DirectorySnapshot> {

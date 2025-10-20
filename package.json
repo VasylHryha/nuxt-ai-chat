@@ -6,15 +6,15 @@
     "bun": ">=1.1.0"
   },
   "scripts": {
-    "build": "nuxt build",
+    "build": "bun run --bun nuxt build",
     "dev": "nuxt dev --dotenv .env.local",
     "generate": "nuxt generate",
-    "preview": "nuxt preview",
+    "preview": "bun run --bun nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint --ext .js,.ts,.vue .",
     "lint:fix": "eslint --fix --ext .js,.ts,.vue .",
     "db:migrate": "bun run ./db/scripts/migrate.js",
-    "db:reset": "rimraf db/sqlite/app.db && pnpm db:migrate",
+    "db:reset": "rimraf db/sqlite/app.db && bun db:migrate",
     "db:seed": "bun run db/scripts/seed.ts"
   },
   "dependencies": {
@@ -22,7 +22,6 @@
     "@ai-sdk/google": "^2.0.23",
     "@ai-sdk/openai": "^2.0.52",
     "@ai-sdk/vue": "^2.0.71",
-    "@googlemaps/markerclusterer": "^2.6.2",
     "@node-rs/argon2": "^2.0.2",
     "@nuxt/fonts": "^0.11.4",
     "@nuxt/scripts": "0.12.1",
@@ -35,8 +34,10 @@
     "ai": "^5.0.71",
     "better-sqlite3": "^12.4.1",
     "nuxt": "^4.1.3",
+    "nuxt-ssr-api-logger": "^2.0.2",
     "openai": "^6.3.0",
     "pinia": "^3.0.3",
+    "sqlite3": "^5.1.7",
     "tailwindcss": "^4.1.14",
     "typescript": "^5.6.3",
     "vue": "^3.5.22",
@@ -44,6 +45,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^5.4.1"
+    "@antfu/eslint-config": "^5.4.1",
+    "rimraf": "^6.0.1"
   }
 }

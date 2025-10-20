@@ -35,15 +35,29 @@ export const useChatSessions = defineStore('chat.sessions', () => {
   async function hydrate() {
     const snapshot = await chatRepository.load()
 
+    // Ensure snapshot has valid structure
+    if (!snapshot || !snapshot.profiles) {
+      console.warn('[chat.sessions] Invalid snapshot structure, using empty state')
+      // Create default session
+      createNewSession(
+        'AI Chat',
+        'ai-openai',
+        'gpt-4',
+        'Hi! How can I help you today?',
+      )
+      return
+    }
+
     // Extract current profile from snapshot
-    const currentProfile = snapshot.profiles[snapshot.currentProfileId]
+    const currentProfile = snapshot.currentProfileId ? snapshot.profiles[snapshot.currentProfileId] : undefined
 
     if (currentProfile) {
       profileId.value = currentProfile.id
-      sessions.value = currentProfile.sessions
-      currentSessionId.value = currentProfile.currentSessionId
+      sessions.value = currentProfile.sessions || {}
+      currentSessionId.value = currentProfile.currentSessionId || ''
     }
 
+    // Create default session if none exists
     if (!current.value || !currentSessionId.value) {
       createNewSession(
         'AI Chat',

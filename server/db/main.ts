@@ -1,18 +1,32 @@
+import type Database from 'better-sqlite3'
+// server/db/main.ts
+import { createRequire } from 'node:module'
 import process from 'node:process'
-import Database from 'better-sqlite3'
 
-const DB_PATH = new URL('../../db/sqlite/app.db', import.meta.url).pathname
+type GlobalWithDb = typeof globalThis & { __NUXT_TEST_DB__?: Database }
 
-type GlobalWithDb = typeof globalThis & {
-  __NUXT_TEST_DB__?: Database
+const req = createRequire(import.meta.url)
+const Better = req('better-sqlite3') as typeof import('better-sqlite3').default
+
+// Resolve DB path from Nuxt runtime config
+const cfg = useRuntimeConfig()
+const dbPath = cfg.dbPath || 'db/sqlite/app.db'
+
+const g = globalThis as GlobalWithDb
+const db: Database = g.__NUXT_TEST_DB__ ?? new Better(dbPath, { fileMustExist: false, readonly: false })
+
+try {
+  // sensible pragmas
+  // @ts-expect-error runtime method
+  db.pragma?.('journal_mode = WAL')
+  // @ts-expect-error runtime method
+  db.pragma?.('foreign_keys = ON')
+  // @ts-expect-error runtime method
+  db.pragma?.('busy_timeout = 3000')
 }
+catch {}
 
-const globalRef = globalThis as GlobalWithDb
-
-// Reuse in-memory connection when tests preconfigure one; otherwise open file-backed DB.
-const db = globalRef.__NUXT_TEST_DB__ ?? new Database(DB_PATH)
-
-if (!globalRef.__NUXT_TEST_DB__ && process.env.NODE_ENV === 'test')
-  globalRef.__NUXT_TEST_DB__ = db
+if (process.env.NODE_ENV === 'test')
+  g.__NUXT_TEST_DB__ = db
 
 export default db

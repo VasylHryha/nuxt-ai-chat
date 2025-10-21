@@ -1,24 +1,15 @@
 import { listChatsByUserEmail } from '@/server/db/chats'
 import { getLastMessageByChatId, getMessageCountByChatId } from '@/server/db/messages'
+// Note: safeValidateQuery, listChatsQuerySchema are auto-imported from server/utils/
 
 export default defineEventHandler((event) => {
   const authUser = requireUser(event)
-  const q = getQuery(event)
-  const email = String(q.email || '').trim().toLowerCase()
-  if (!email)
-    throw createError({ statusCode: 400, statusMessage: 'email is required' })
-  if (!isValidEmail(email))
-    throw createError({ statusCode: 400, statusMessage: 'Invalid email' })
+
+  // Validate query parameters with Zod schema (auto-imported)
+  const { email, provider, model, startDate, endDate } = safeValidateQuery(getQuery(event), listChatsQuerySchema)
 
   if (email !== authUser.email)
     throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-
-  const provider = q.provider ? String(q.provider) : undefined
-  const model = q.model ? String(q.model) : undefined
-
-  // Date filters
-  const startDate = q.startDate ? Number(q.startDate) : undefined
-  const endDate = q.endDate ? Number(q.endDate) : undefined
 
   try {
     let rows = listChatsByUserEmail({ email, provider, model })

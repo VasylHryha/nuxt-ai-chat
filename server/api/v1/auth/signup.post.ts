@@ -1,26 +1,16 @@
 import { getUserByEmail, insertUser, upsertPasswordCredential } from '@/server/db/users'
 // server/api/v1/auth/signup.post.ts
-// Note: setAccessCookie, signJWT, hashPassword are auto-imported from server/utils/
+// Note: setAccessCookie, signJWT, hashPassword, safeValidate, signupSchema are auto-imported from server/utils/
 
 export default defineEventHandler(async (event) => {
-  const { email, name, password } = await readBody<{ email?: string, name?: string, password?: string }>(event)
+  // Validate input with Zod schema (auto-imported)
+  const { email, name, password } = await safeValidate(readBody(event), signupSchema)
 
-  if (!email || !name || !password)
-    throw createError({ statusCode: 400, statusMessage: 'email, name, and password are required' })
-
-  const cleanEmail = email.trim().toLowerCase()
-  const emailRe = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/
-  if (!emailRe.test(cleanEmail))
-    throw createError({ statusCode: 400, statusMessage: 'Invalid email' })
-
-  if (password.length < 8)
-    throw createError({ statusCode: 400, statusMessage: 'Password must be at least 8 characters' })
-
-  if (getUserByEmail(cleanEmail))
+  if (getUserByEmail(email))
     throw createError({ statusCode: 409, statusMessage: 'Email already exists' })
 
   try {
-    const user = insertUser({ email: cleanEmail, name: name.trim() })
+    const user = insertUser({ email, name })
     const phash = await hashPassword(password)
     upsertPasswordCredential(user.id, phash)
 
@@ -36,8 +26,9 @@ export default defineEventHandler(async (event) => {
       user: { id: user.id, email: user.email, name: user.name, createdAt: new Date(user.created_at).toISOString() },
     }
   }
-  catch (error: any) {
+  catch (error: unknown) {
     // surfaces real cause during dev
-    throw createError({ statusCode: 500, statusMessage: `Signup failed: ${error?.message || 'internal error'}` })
+    const message = error instanceof Error ? error.message : 'internal error'
+    throw createError({ statusCode: 500, statusMessage: `Signup failed: ${message}` })
   }
 })

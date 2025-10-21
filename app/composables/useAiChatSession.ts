@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai'
-import { Chat, DefaultChatTransport, createIdGenerator } from 'ai'
+import { Chat } from '@ai-sdk/vue'
+import { createIdGenerator, DefaultChatTransport } from 'ai'
 import { useChatPersistence } from '@/composables/useChatPersistence'
 import { useAuth } from '@/stores/auth'
 
@@ -65,7 +66,7 @@ export function useAiChatSession(options: UseAiChatSessionOptions = {}) {
       }
 
       const title = generateTitle(firstUserMessage.content)
-      const chatId = await createChat(provider.value, model.value, title)
+      const chatId = await createChat(provider.value, model.value, title, 'ai-sdk')
       if (!chatId) {
         console.error('[AI Chat] Failed to create chat')
         isSaving.value = false
@@ -135,4 +136,3 @@ export function useAiChatSession(options: UseAiChatSessionOptions = {}) {
     loadExistingChatById,
   }
 }
-

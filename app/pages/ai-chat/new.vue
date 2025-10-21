@@ -4,7 +4,7 @@ import { getChatRouteFor } from '@/services/providers/routing'
 
 const router = useRouter()
 const { chat, currentChatId, provider, model } = useAiChatSession({
-  onFirstChatCreated: (id) => router.replace(getChatRouteFor(provider.value, model.value, id)),
+  onFirstChatCreated: id => router.replace(getChatRouteFor(provider.value, model.value, id)),
 })
 
 const input = ref('')

@@ -15,8 +15,8 @@ export function getOrCreateConnection(
 
   const found = db.prepare(`
         SELECT * FROM connections
-        WHERE user_id = ? AND provider = ? AND model = ? AND deleted_at IS NULL
-    `).get(userId, prov, mdl) as Connection | undefined
+        WHERE user_id = ? AND provider = ? AND model = ? AND ui = ? AND deleted_at IS NULL
+    `).get(userId, prov, mdl, ui) as Connection | undefined
 
   if (found)
     return found

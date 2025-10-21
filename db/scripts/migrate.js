@@ -1,11 +1,8 @@
 import { mkdir, readdir, readFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-
-const require = createRequire(import.meta.url)
-const BetterSqlite3 = require('better-sqlite3')
+import { Database } from 'bun:sqlite'
 
 // Project root = two levels up from this script: db/scripts/ -> <root>
 const __filename = fileURLToPath(import.meta.url)
@@ -20,7 +17,7 @@ function resolvePath(p, fallback) {
   return fallback
 }
 
-// Defaults based on this file’s location
+// Defaults based on this file's location
 const DEFAULT_DB = fileURLToPath(new URL('../sqlite/app.db', import.meta.url)) // absolute
 const DEFAULT_MIG = fileURLToPath(new URL('../migrations', import.meta.url)) // absolute
 
@@ -33,17 +30,19 @@ console.log(DB_PATH)
 // 1) Ensure parent directory exists
 await mkdir(path.dirname(DB_PATH), { recursive: true })
 
-// 2) Open DB
-const db = new BetterSqlite3(DB_PATH, { fileMustExist: false })
+// 2) Open DB using Bun's native SQLite
+const db = new Database(DB_PATH, { create: true })
 try {
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
-  db.pragma('busy_timeout = 3000')
+  db.run('PRAGMA journal_mode = WAL')
+  db.run('PRAGMA foreign_keys = ON')
+  db.run('PRAGMA busy_timeout = 3000')
 }
-catch {}
+catch (err) {
+  console.error('PRAGMA setup failed:', err)
+}
 
 // 3) _migrations table
-db.exec(`
+db.run(`
     CREATE TABLE IF NOT EXISTS _migrations (
                                                id INTEGER PRIMARY KEY AUTOINCREMENT,
                                                name TEXT NOT NULL UNIQUE,
@@ -62,17 +61,25 @@ const files = entries
   .map(e => e.name)
   .sort()
 
-const applyOne = db.transaction((name, sql) => {
-  db.exec(sql)
-  db.prepare(`INSERT INTO _migrations (name, applied_at) VALUES (?, ?)`).run(name, Date.now())
-})
-
 for (const name of files) {
   if (applied.has(name))
     continue
   const sql = await readFile(path.join(MIG_DIR, name), 'utf8')
-  applyOne(name, sql)
-  console.log('Applied', name)
+
+  // Apply migration using transaction
+  db.run('BEGIN TRANSACTION')
+  try {
+    db.exec(sql)
+    db.run(`INSERT INTO _migrations (name, applied_at) VALUES (?, ?)`, [name, Date.now()])
+    db.run('COMMIT')
+    console.log('Applied', name)
+  }
+  catch (err) {
+    db.run('ROLLBACK')
+    console.error(`Failed to apply ${name}:`, err)
+    throw err
+  }
 }
 
+db.close()
 console.log('Migrations complete at', DB_PATH)

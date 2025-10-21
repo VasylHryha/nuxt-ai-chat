@@ -13,6 +13,7 @@ export interface CreateChatInput {
   title?: string
   baseURL?: string | null
   settings?: unknown
+  ui?: 'ai-sdk' | 'native' | 'proxy'
 }
 
 export function createChatForUser(input: CreateChatInput): Chat {
@@ -26,10 +27,12 @@ export function createChatForUser(input: CreateChatInput): Chat {
     throw new Error('Invalid provider or model')
 
   // Resolve UI kind from provider (server-controlled; safer than trusting client)
-  const ui: 'ai-sdk' | 'native' | 'proxy'
+  const providedUi = input.ui
+  const derivedUi: 'ai-sdk' | 'native' | 'proxy'
     = (provider === 'openrouter' || provider === 'anthropic' || provider === 'google')
       ? 'proxy'
       : 'ai-sdk'
+  const ui: 'ai-sdk' | 'native' | 'proxy' = (providedUi === 'ai-sdk' || providedUi === 'native' || providedUi === 'proxy') ? providedUi : derivedUi
 
   const conn = getOrCreateConnection(user.id, provider, model, input.baseURL ?? null, input.settings, ui)
 

@@ -100,7 +100,11 @@ Build a production-ready Nuxt 4 starter demonstrating:
 - `/auth/signup` - Signup form (public)
 - `/ai-chat/new` - Start a new AI chat (protected)
 - `/ai-chat/[id]` - Continue an existing AI chat (protected)
-- Route selection centralized in `app/services/providers/routing.ts#getChatRouteFor(provider, model, chatId, ui)`; prefers `ui` from API when present.
+  - Route selection centralized in `app/services/providers/routing.ts#getChatRouteFor(provider, model, chatId, ui)`; prefers `ui` from API when present.
+  - `ui` routes:
+    - `ai-sdk` → `/ai-chat/*`
+    - `proxy` → `/proxy-chat/*` (OpenRouter/Anthropic/Google)
+    - `native` → `/native-chat/*` (OpenAI)
 - `/chats` - Chat list dashboard with stats (protected)
 - `/users` - User management (protected)
 

@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS connections
     label         TEXT    NOT NULL,
     provider      TEXT    NOT NULL,
     model         TEXT    NOT NULL,
+    ui            TEXT    NOT NULL DEFAULT 'ai-sdk', -- 'ai-sdk' | 'native' | 'proxy'
     base_url      TEXT,
     settings_json TEXT,
     created_at    INTEGER NOT NULL,

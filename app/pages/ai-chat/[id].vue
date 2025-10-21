@@ -64,7 +64,9 @@ useHead({ title: 'AI Chat · Nuxt AI Chat' })
       <div v-if="isLoadingChat" class="flex items-center justify-center h-full text-center">
         <div class="space-y-2">
           <UIcon name="i-heroicons-arrow-path-20-solid" class="text-4xl text-fg-muted animate-spin mx-auto" />
-          <p class="text-fg-muted text-sm">Loading chat...</p>
+          <p class="text-fg-muted text-sm">
+            Loading chat...
+          </p>
         </div>
       </div>
 
@@ -81,8 +83,8 @@ useHead({ title: 'AI Chat · Nuxt AI Chat' })
       </div>
 
       <div
-        v-else
         v-for="(m, index) in chat.messages"
+        v-else
         :key="m.id || index"
         class="flex items-start gap-3"
         :class="m.role === 'user' ? 'justify-end' : 'justify-start'"
@@ -146,4 +148,3 @@ useHead({ title: 'AI Chat · Nuxt AI Chat' })
     </form>
   </div>
 </template>
-

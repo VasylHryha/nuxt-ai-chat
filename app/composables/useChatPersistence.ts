@@ -7,11 +7,11 @@ export function useChatPersistence() {
   /**
    * Create a new chat in the database
    */
-  async function createChat(provider: string, model: string, title: string): Promise<string | null> {
+  async function createChat(provider: string, model: string, title: string, ui?: 'ai-sdk' | 'proxy' | 'native'): Promise<string | null> {
     try {
       const response = await $fetch<{ id: string }>('/api/v1/chats/create', {
         method: 'POST',
-        body: { provider, model, title },
+        body: { provider, model, title, ui },
         headers: { Authorization: `Bearer ${auth.token}` },
       })
 

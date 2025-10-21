@@ -1,17 +1,11 @@
 import { createChatForUser } from '@/server/db/chats'
+// Note: safeValidate, createChatSchema are auto-imported from server/utils/
 
 export default defineEventHandler(async (event) => {
   const authUser = requireUser(event)
 
-  const body = await readBody<{
-    provider: string
-    model: string
-    title?: string
-  }>(event)
-
-  // Validation
-  if (!body.provider || !body.model)
-    throw createError({ statusCode: 400, statusMessage: 'provider and model are required' })
+  // Validate input with Zod schema (auto-imported)
+  const body = await safeValidate(readBody(event), createChatSchema)
 
   try {
     const chat = createChatForUser({
@@ -19,6 +13,7 @@ export default defineEventHandler(async (event) => {
       provider: body.provider,
       model: body.model,
       title: body.title,
+      ui: body.ui,
     })
 
     return {

@@ -60,7 +60,7 @@ export const useAuth = defineStore('auth', () => {
       user.value = u
       isInitialized.value = true
     }
-    catch (e: any) {
+    catch {
       // silent — unauthenticated is normal on first load
     }
     finally {

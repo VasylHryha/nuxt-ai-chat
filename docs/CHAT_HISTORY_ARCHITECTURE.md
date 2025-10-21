@@ -143,9 +143,19 @@ GET    /api/v1/chats
        File: server/api/v1/chats/index.get.ts
 
 POST   /api/v1/chats/create
-       Body: { provider, model, title? }
+       Body: { provider, model, title?, ui? }   // ui ∈ {'ai-sdk','proxy','native'}; optional
        Returns: { id, title, provider, model, createdAt, updatedAt }
        File: server/api/v1/chats/create.post.ts
+
+POST   /api/v1/openai/chat.stream
+       Body: { messages[], model?, temperature? }
+       Returns: streaming text chunks (plain text)
+       File: server/api/v1/openai/chat.stream.post.ts
+
+POST   /api/v1/openrouter/chat.stream
+       Body: { messages[], model?, temperature? }
+       Returns: streaming text chunks (plain text)
+       File: server/api/v1/openrouter/chat.stream.post.ts
 
 GET    /api/v1/chats/{chatId}
        Returns: { chat, messages[] }

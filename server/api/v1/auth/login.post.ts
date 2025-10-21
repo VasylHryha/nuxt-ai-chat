@@ -1,15 +1,11 @@
 // server/api/v1/auth/login.post.ts
 import { getPasswordHashByEmail } from '@/server/db/users'
+// Note: safeValidate, loginSchema are auto-imported from server/utils/
 
 export default defineEventHandler(async (event) => {
-  const { email, password } = await readBody<{ email: string, password: string }>(event)
-  if (!email || !password)
-    throw createError({ statusCode: 400, statusMessage: 'email and password required' })
-
-  const clean = String(email).trim().toLowerCase()
-  if (!isValidEmail(clean))
-    throw createError({ statusCode: 400, statusMessage: 'Invalid email' })
-  const record = getPasswordHashByEmail(clean)
+  // Validate input with Zod schema (auto-imported)
+  const { email, password } = await safeValidate(readBody(event), loginSchema)
+  const record = getPasswordHashByEmail(email)
 
   if (!record)
     throw createError({ statusCode: 401, statusMessage: 'Invalid credentials' })

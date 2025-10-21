@@ -30,10 +30,11 @@ This is a **Nuxt 4 AI Chat Starter** demonstrating secure multi-provider AI inte
 ```bash
 # Development
 bun run dev                          # Start dev server (http://localhost:3000)
+                                     # Note: Do NOT use --bun flag (breaks Vite dev server)
 
 # Database
 bun run db:migrate                   # Run migrations (creates schema)
-bun run db/scripts/seeds.js <email>  # Seed test user (password: "password")
+bun db:seed <email>                  # Seed test user (password: "password")
 
 # Production
 bun run build                        # Build for production
@@ -66,13 +67,31 @@ This project supports three AI provider integration patterns. Choose based on yo
 - Best for: Quick integration (5 min setup)
 - Factory: `createProxyProvider(key, endpoint)`
 - Example: OpenRouter at `/api/v1/openrouter/chat.post.ts`
+- Client: `useChatSession({ type: 'proxy' })`
 
 **3. Native Providers** (`type: 'native'`)
 - Direct SDK integration with full features
 - Best for: Provider-specific capabilities
-- Example: `openai.native.ts` using OpenAI SDK directly
+- Example: OpenAI using OpenAI SDK directly
+- Client: `useChatSession({ type: 'native' })`
 
 All providers register in `app/services/providers/index.ts` with metadata in `PROVIDER_INFO`.
+
+**Unified Client Pattern**:
+Both Native and Proxy use the consolidated `useChatSession()` composable which handles provider selection, streaming, error management, and message persistence:
+```typescript
+// Native provider chat
+const { chat, currentChatId, isSending, errorMessage, loadExistingChatById } = useChatSession({
+  type: 'native',
+  onFirstChatCreated: (id) => router.replace(`/native-chat/${id}`)
+})
+
+// Proxy provider chat
+const { chat, currentChatId, isSending, errorMessage, loadExistingChatById } = useChatSession({
+  type: 'proxy',
+  onFirstChatCreated: (id) => router.replace(`/proxy-chat/${id}`)
+})
+```
 
 ### Repository-Store-Component Pattern
 
@@ -166,11 +185,30 @@ messages           -- Message history (chat_id, role, content, timestamps)
 **Migration**: `db/migrations/001_init.sql`
 **Types**: `db/types.ts` (DB rows) vs API DTOs (camelCase)
 
+### Bun Native SQLite
+
+This project uses **Bun's native SQLite** (`bun:sqlite`) for maximum Bun integration:
+- ✅ No native module conflicts (uses pure Bun runtime)
+- ✅ Works seamlessly in dev mode with Vite
+- ✅ Used in `server/db/main.ts` for all queries
+- ✅ Used in `db/scripts/migrate.js` and `db/scripts/seeds.js`
+
+**Not using**: `better-sqlite3` (native module ABI conflicts)
+
 ## Key File Locations
 
 ```
 app/
-├── composables/useChatProvider.ts   # Provider resolution logic
+├── composables/
+│   ├── useChatSession.ts            # Unified composable (native + proxy)
+│   ├── useChatPersistence.ts        # Chat persistence + sync
+│   └── useChatProvider.ts           # Provider resolution logic
+├── utils/
+│   ├── messageFormat.ts             # API ↔ UI message format conversion
+│   ├── streaming.ts                 # Unified SSE streaming handler
+│   └── endpoints.ts                 # Streaming endpoint configuration
+├── config/
+│   └── endpoints.ts                 # Provider endpoint mapping
 ├── services/
 │   ├── providers/                   # AI provider adapters
 │   │   ├── index.ts                 # Registry + factory
@@ -198,7 +236,10 @@ server/
 │   │   ├── [chatId].delete.ts       # Soft delete chat
 │   │   └── [chatId]/messages.post.ts # Add message to chat
 │   ├── users/index.get.ts           # User management
-│   └── {provider}/chat.post.ts      # Provider-specific endpoints
+│   ├── anthropic/chat.stream.post.ts  # Anthropic streaming endpoint
+│   ├── google/chat.stream.post.ts     # Google streaming endpoint
+│   ├── openai/chat.stream.post.ts     # OpenAI streaming endpoint
+│   └── openrouter/chat.stream.post.ts # OpenRouter streaming endpoint
 ├── db/
 │   ├── main.ts                      # DB instance
 │   ├── users.ts, chats.ts           # Query helpers
@@ -290,6 +331,8 @@ export interface AuthUser {
 ```
 
 ### Error Handling
+
+**Server-side** (API routes):
 ```typescript
 // ✅ Good: User-friendly + log details
 try {
@@ -308,6 +351,22 @@ throw createError({
   statusMessage: error.message  // Might leak secrets!
 })
 ```
+
+**Client-side** (Composables):
+The `useChatSession()` composable automatically captures errors in `errorMessage` ref and displays them in the UI:
+```typescript
+const { chat, errorMessage, isSending } = useChatSession({ type: 'native' })
+
+// errorMessage is reactive and displayed to user
+// isSending tracks streaming state
+// Both are automatically cleared/set by the composable
+```
+
+**Error sources captured:**
+- Network failures (fetch errors)
+- Invalid API responses (non-streaming fallback only for native)
+- Streaming parse errors
+- User authentication failures
 
 ## Change Workflow
 
@@ -351,6 +410,61 @@ bun test                  # All tests
 bun test auth             # Tests matching "auth"
 bun test --coverage       # With coverage
 ```
+
+## Streaming & Message Format Utilities
+
+### Unified Streaming Handler (`app/utils/streaming.ts`)
+
+All provider streaming uses a consolidated handler:
+
+```typescript
+// Handles SSE streams from any provider endpoint
+async function streamFromEndpoint(
+  endpoint: string,
+  body: Record<string, unknown>,
+  onChunk: (text: string) => void,
+  abortSignal?: AbortSignal
+): Promise<string>
+```
+
+**Features:**
+- Automatic reader cleanup via `releaseLock()`
+- Abort signal support for cancellation
+- Provider-agnostic chunk parsing (caller defines format)
+- Accumulated text return
+
+### Message Format Conversion (`app/utils/messageFormat.ts`)
+
+Converts between API format (string content) and UI format (parts array):
+
+```typescript
+// API → UI: string content becomes parts array
+convertApiToUIMessages(messages: APIMessage[]): UIMessage[]
+
+// UI → API: parts array becomes string content
+convertUIMessagesToApi(messages: UIMessage[]): APIMessage[]
+
+// Factory for creating properly typed UI messages
+createUIMessage(id: string, role: string, content: string): UIMessage
+```
+
+### Provider Streaming Endpoints
+
+All four providers have consolidated streaming endpoints with consistent error handling:
+
+| Provider | Endpoint | SSE Format |
+|----------|----------|-----------|
+| OpenAI | `/api/v1/openai/chat.stream.post.ts` | `choices[0].delta.content` |
+| Anthropic | `/api/v1/anthropic/chat.stream.post.ts` | `payload.delta.text` |
+| Google | `/api/v1/google/chat.stream.post.ts` | `choices[0].delta.content` |
+| OpenRouter | `/api/v1/openrouter/chat.stream.post.ts` | OpenAI-compatible |
+
+**Common Pattern:**
+1. Receive messages + model from client
+2. Call provider API with streaming
+3. Parse SSE chunks and extract text tokens
+4. Validate response format with debug logging
+5. Stream tokens back to client via SSE
 
 ## Common Tasks
 
@@ -439,6 +553,9 @@ OPENROUTER_API_KEY=sk-or-...
 4. **Using `any` type** - Use `unknown` in catch blocks, proper types elsewhere
 5. **Skipping tests** - Add tests for all new features
 6. **Not reading AI_PLAYBOOK.md first** - It contains critical patterns and rules
+7. **Using separate native/proxy composables** - Use unified `useChatSession({ type })` instead
+8. **Parsing SSE streams manually** - Use `streamFromEndpoint()` utility function
+9. **Not checking provider-specific fallback support** - Native has fallback, proxy does not; check before attempting
 
 ## Priority Order for Work
 

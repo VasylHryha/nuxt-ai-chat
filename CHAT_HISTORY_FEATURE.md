@@ -357,7 +357,7 @@ The implementation follows the existing codebase patterns and is ready for produ
 To support different interaction patterns per provider, we added a first-class `ui` kind to `connections` and centralized client routing.
 
 - `connections.ui` values: `ai-sdk` | `proxy` | `native` (default: `ai-sdk`).
-- Server sets `ui` based on provider; clients do not decide this value.
+– Clients specify `ui` when creating a chat (ai-sdk | proxy | native); the server validates and persists it. If omitted, the server derives a sensible default from provider.
 - Client routing uses `getChatRouteFor(provider, model, chatId, ui)`.
 
 Routes per UI kind:
@@ -372,3 +372,16 @@ Migrations:
 Rationale:
 - Keeps routing deterministic without guessing by provider on the client.
 - Enables tailored UIs (reasoning displays, tool-calls) per backend integration style.
+
+## Streaming Support (Decision & Implementation)
+
+Decision: Align native/proxy UX with AI SDK by adding streaming endpoints; fallback to non‑streaming when necessary.
+
+Backend:
+- `POST /api/v1/openai/chat.stream` → Streams tokens from OpenAI Chat Completions (stream: true), transforms SSE deltas into plain text chunks.
+- `POST /api/v1/openrouter/chat.stream` → Streams tokens from OpenRouter (stream: true), transforms SSE deltas into plain text chunks.
+
+Frontend:
+- `useNativeChatSession` and `useProxyChatSession` now stream replies using `fetch(...).body.getReader()` and update the last assistant message incrementally, then persist the assistant message on completion. If streaming fails, they fall back to existing non‑streaming endpoints.
+
+Why: Better perceived latency and parity with AI SDK chat behavior.

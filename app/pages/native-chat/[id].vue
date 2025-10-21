@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { useAiChatSession } from '@/composables/useAiChatSession'
+import { useChatSession } from '@/composables/useChatSession'
 
 const route = useRoute()
-const { chat, currentChatId, isLoadingChat, loadExistingChatById } = useAiChatSession()
+const { chat, currentChatId, isLoadingChat, isSending, errorMessage, loadExistingChatById } = useChatSession({
+  type: 'native',
+})
 
 onMounted(() => {
   const id = route.params.id as string | undefined
@@ -32,8 +34,12 @@ useHead({ title: 'Native Chat · Nuxt AI Chat' })
           <UIcon name="i-heroicons-arrow-left-20-solid" class="text-xl" />
         </NuxtLink>
         <div>
-          <h1 class="text-2xl font-semibold text-fg">Native Chat</h1>
-          <p class="text-sm text-fg-muted">{{ currentChatId ? 'Continue conversation' : 'Loading...' }}</p>
+          <h1 class="text-2xl font-semibold text-fg">
+            Native Chat
+          </h1>
+          <p class="text-sm text-fg-muted">
+            {{ currentChatId ? 'Continue conversation' : 'Loading...' }}
+          </p>
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -46,31 +52,51 @@ useHead({ title: 'Native Chat · Nuxt AI Chat' })
       </div>
     </div>
 
+    <!-- Error Display -->
+    <div v-if="errorMessage" class="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-400/20 flex items-center gap-2">
+      <UIcon name="i-heroicons-exclamation-circle-16-solid" class="text-red-600 size-5 shrink-0" />
+      <p class="text-red-600 text-sm">
+        {{ errorMessage }}
+      </p>
+    </div>
+
     <div class="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
       <div v-if="isLoadingChat" class="flex items-center justify-center h-full text-center">
         <div class="space-y-2">
           <UIcon name="i-heroicons-arrow-path-20-solid" class="text-4xl text-fg-muted animate-spin mx-auto" />
-          <p class="text-fg-muted text-sm">Loading chat...</p>
+          <p class="text-fg-muted text-sm">
+            Loading chat...
+          </p>
         </div>
       </div>
 
       <div v-else-if="chat.messages.length === 0" class="flex items-center justify-center h-full text-center">
         <div class="space-y-2">
           <UIcon name="i-heroicons-chat-bubble-left-right-20-solid" class="text-4xl text-fg-subtle mx-auto" />
-          <p class="text-fg-muted text-sm">Start a conversation</p>
+          <p class="text-fg-muted text-sm">
+            Start a conversation
+          </p>
         </div>
       </div>
 
-      <div v-else v-for="(m, index) in chat.messages" :key="m.id || index" class="flex items-start gap-3"
-           :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
-        <div v-if="m.role !== 'user'"
-             class="size-8 rounded-full bg-blue-500/15 border border-blue-400/25 flex items-center justify-center shrink-0">
+      <div
+        v-for="(m, index) in chat.messages" v-else :key="m.id || index" class="flex items-start gap-3"
+        :class="m.role === 'user' ? 'justify-end' : 'justify-start'"
+      >
+        <div
+          v-if="m.role !== 'user'"
+          class="size-8 rounded-full bg-blue-500/15 border border-blue-400/25 flex items-center justify-center shrink-0"
+        >
           <UIcon name="i-heroicons-sparkles-16-solid" class="text-blue-300 size-4" />
         </div>
-        <div class="panel shadow-soft px-4 py-3 max-w-[80%]"
-             :class="m.role === 'user' ? 'bg-blue-500/10 border-blue-400/20' : ''">
+        <div
+          class="panel shadow-soft px-4 py-3 max-w-[80%]"
+          :class="m.role === 'user' ? 'bg-blue-500/10 border-blue-400/20' : ''"
+        >
           <div v-for="(part, i) in m.parts" :key="`${m.id}-${part.type}-${i}`" class="text-fg text-sm leading-relaxed">
-            <div v-if="part.type === 'text'">{{ part.text }}</div>
+            <div v-if="part.type === 'text'">
+              {{ part.text }}
+            </div>
           </div>
         </div>
         <div v-if="m.role === 'user'" class="size-8 rounded-full bg-[var(--panel)] border border-[var(--panel-border)] flex items-center justify-center shrink-0">
@@ -81,15 +107,20 @@ useHead({ title: 'Native Chat · Nuxt AI Chat' })
 
     <form class="flex items-end gap-2" @submit="handleSubmit">
       <div class="flex-1">
-        <textarea v-model="input" placeholder="Type your message..." rows="2"
-                  class="w-full rounded-lg border border-[var(--panel-border)] bg-[var(--glass)] px-4 py-3 outline-none focus:ring-2 focus:ring-blue-400/40 resize-none text-fg"
-                  @keydown.enter.exact.prevent="handleSubmit" />
+        <textarea
+          v-model="input" placeholder="Type your message..." rows="2"
+          class="w-full rounded-lg border border-[var(--panel-border)] bg-[var(--glass)] px-4 py-3 outline-none focus:ring-2 focus:ring-blue-400/40 resize-none text-fg"
+          @keydown.enter.exact.prevent="handleSubmit"
+        />
       </div>
-      <button type="submit" class="chip px-5 py-3 rounded-lg font-medium flex items-center gap-2 h-fit"
-              :disabled="!input.trim()">
-        <UIcon name="i-heroicons-paper-airplane-16-solid" /> Send
+      <button
+        type="submit" class="chip px-5 py-3 rounded-lg font-medium flex items-center gap-2 h-fit"
+        :disabled="!input.trim() || isSending"
+      >
+        <UIcon v-if="isSending" name="i-heroicons-arrow-path-16-solid" class="animate-spin" />
+        <UIcon v-else name="i-heroicons-paper-airplane-16-solid" />
+        {{ isSending ? 'Sending...' : 'Send' }}
       </button>
     </form>
   </div>
 </template>
-

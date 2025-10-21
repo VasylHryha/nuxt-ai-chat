@@ -274,55 +274,41 @@ This document tracks remaining improvements to bring the codebase to production-
 
 ## 🔴 High Priority (Core Functionality)
 
-### 1. Add Input Validation Schema (Zod)
-**Effort**: ~2 hours | **Impact**: High (Security + DX)
+### 1. ✅ Add Input Validation Schema (Zod) - COMPLETED
+**Status**: DONE | **Implementation time**: ~1.5 hours
 
-**Problem**: Query/body parameters use loose `String()` casting without validation.
+**What was done**:
+- Created centralized Zod schema file: `server/utils/validators.ts`
+- Added 6 reusable schemas: `signupSchema`, `loginSchema`, `createChatSchema`, `chatProxySchema`, `listChatsQuerySchema`, `streamChatSchema`
+- Added helper functions: `safeValidate()` for body validation, `safeValidateQuery()` for query params
+- Updated 5 key endpoints to use Zod validation:
+  - `server/api/v1/auth/signup.post.ts`
+  - `server/api/v1/auth/login.post.ts`
+  - `server/api/v1/chats/index.get.ts`
+  - `server/api/v1/chats/create.post.ts`
+  - `server/api/v1/chats/index.post.ts`
 
-**Files**:
-- `server/api/v1/chats/index.get.ts:4-10`
-- `server/api/v1/auth/signup.post.ts:5-6`
-- All API endpoints with query params
-
-**Solution**:
-```typescript
-import { z } from 'zod'
-
-const schema = z.object({
-  email: z.string().email(),
-  provider: z.enum(['openai', 'openrouter', 'anthropic', 'google']).optional(),
-  model: z.string().optional(),
-})
-
-const validated = schema.parse(getQuery(event))
-```
-
-**Benefits**: Type-safe parsing, automatic error messages, runtime validation
+**Benefits**:
+- Type-safe parsing with automatic transformations (trim, lowercase)
+- Clear error messages with field names
+- Runtime validation prevents injection attacks
+- Easy to extend for new endpoints
 
 ---
 
-### 2. Add Rate Limiting for Auth Endpoints
-**Effort**: ~1-2 hours | **Impact**: High (Security)
+### 2. 🟡 Add Rate Limiting for Auth Endpoints - OPTIONAL (TEST PROJECT)
+**Status**: NOT IMPLEMENTED (optional template provided)
+**Reason**: This is a test/development project - rate limiting can be added for production
 
-**Problem**: Login/signup endpoints have no rate limiting, vulnerable to brute force.
+**For production, see**:
+- `server/middleware/02.rateLimit.ts.example` - Complete template with implementation guide
+- Recommended: Max 5 login attempts per IP per 15 minutes
+- Recommended: Max 3 signup attempts per IP per hour
 
-**Files to create**:
-- `server/middleware/rateLimit.ts`
-- Update `server/api/v1/auth/login.post.ts`
-- Update `server/api/v1/auth/signup.post.ts`
-
-**Solution**: Use `unjs/unstorage` with in-memory driver or Redis:
-```typescript
-// Track attempts by IP or email
-const attempts = await storage.getItem(`login:${ip}`)
-if (attempts > 5)
-  throw createError({ statusCode: 429, message: 'Too many attempts' })
-```
-
-**Acceptance criteria**:
-- Max 5 login attempts per IP per 15 minutes
-- Max 3 signup attempts per IP per hour
-- Clear error messages for rate limit hits
+**To enable**:
+1. Rename `02.rateLimit.ts.example` → `02.rateLimit.ts`
+2. Install: `bun add unstorage` (or use Redis driver)
+3. Uncomment the implementation
 
 ---
 

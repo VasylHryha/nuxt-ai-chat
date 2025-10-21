@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { getChatRouteFor } from '@/services/providers/routing'
+
 const auth = useAuth()
 
 interface Chat {
@@ -26,6 +28,12 @@ const error = ref<string | null>(null)
 const searchQuery = ref('')
 const selectedProvider = ref<string>('all')
 const dateFilter = ref<string>('all') // 'all', 'today', 'week', 'month'
+
+// Modal state
+const isDeleteModalOpen = ref(false)
+const pendingDeleteId = ref<string>('')
+const pendingDeleteTitle = ref<string>('')
+const deleteError = ref<string | null>(null)
 
 // Fetch chats
 async function fetchChats() {
@@ -74,13 +82,20 @@ async function fetchChats() {
   }
 }
 
-// Delete chat
-async function deleteChat(chatId: string, chatTitle: string) {
-  if (!confirm(`Are you sure you want to delete "${chatTitle}"?`))
-    return
+// Open delete confirmation modal
+function openDeleteModal(chatId: string, chatTitle: string) {
+  pendingDeleteId.value = chatId
+  pendingDeleteTitle.value = chatTitle
+  deleteError.value = null
+  isDeleteModalOpen.value = true
+}
+
+// Confirm and delete chat
+async function confirmDeleteChat() {
+  deleteError.value = null
 
   try {
-    await $fetch(`/api/v1/chats/${chatId}`, {
+    await $fetch(`/api/v1/chats/${pendingDeleteId.value}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${auth.token}`,
@@ -88,10 +103,11 @@ async function deleteChat(chatId: string, chatTitle: string) {
     })
 
     // Remove from list
-    chats.value = chats.value.filter(c => c.id !== chatId)
+    chats.value = chats.value.filter(c => c.id !== pendingDeleteId.value)
+    isDeleteModalOpen.value = false
   }
   catch (err: any) {
-    alert(err?.message || 'Failed to delete chat')
+    deleteError.value = err?.message || 'Failed to delete chat'
     console.error('[Chats] Failed to delete:', err)
   }
 }
@@ -107,8 +123,6 @@ const filteredChats = computed(() => {
     || chat.lastMessage?.content.toLowerCase().includes(query),
   )
 })
-
-import { getChatRouteFor } from '@/services/providers/routing'
 
 // Compute route target per chat based on provider/model
 function getChatLink(chat: Chat) {
@@ -319,11 +333,47 @@ useHead({ title: 'My Chats · Nuxt AI Chat' })
         <!-- Delete Button -->
         <button
           class="absolute top-4 right-4 chip px-3 py-1 text-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
-          @click.prevent="deleteChat(chat.id, chat.title)"
+          @click.prevent="openDeleteModal(chat.id, chat.title)"
         >
           <UIcon name="i-heroicons-trash-20-solid" />
         </button>
       </div>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <UModal v-model="isDeleteModalOpen">
+      <div class="p-6">
+        <h2 class="text-xl font-semibold text-fg mb-2">
+          Delete Chat
+        </h2>
+        <p class="text-fg-muted mb-6">
+          Are you sure you want to delete "<strong>{{ pendingDeleteTitle }}</strong>"? This action cannot be undone.
+        </p>
+
+        <!-- Error message -->
+        <div v-if="deleteError" class="bg-red-500/10 border border-red-500/20 rounded p-3 mb-6">
+          <p class="text-red-400 text-sm">
+            {{ deleteError }}
+          </p>
+        </div>
+
+        <!-- Modal Actions -->
+        <div class="flex gap-3 justify-end">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            @click="isDeleteModalOpen = false"
+          >
+            Cancel
+          </UButton>
+          <UButton
+            color="error"
+            @click="confirmDeleteChat"
+          >
+            Delete
+          </UButton>
+        </div>
+      </div>
+    </UModal>
   </div>
 </template>

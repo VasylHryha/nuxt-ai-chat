@@ -2,15 +2,30 @@
 import { useAiChatSession } from '@/composables/useAiChatSession'
 
 const route = useRoute()
-const { chat, currentChatId, isLoadingChat, loadExistingChatById } = useAiChatSession()
+const router = useRouter()
 
-onMounted(() => {
-  const id = route.params.id as string | undefined
-  if (id)
-    loadExistingChatById(id)
+// Get chatId from route or generate new one
+let initialChatId = route.params.id as string
+
+// If no id in route, generate one and replace URL
+if (!initialChatId || initialChatId === 'new') {
+  const { nanoid } = await import('nanoid')
+  initialChatId = `chat__${nanoid()}`
+  await router.replace(`/ai-chat/${initialChatId}`)
+}
+
+const { chat, currentChatId, isLoadingChat, loadExistingChatById } = useAiChatSession({
+  chatId: initialChatId,
 })
 
 const input = ref('')
+
+// Load existing chat if not already loaded
+onMounted(async () => {
+  if (!chat.messages.length && currentChatId.value) {
+    await loadExistingChatById(currentChatId.value)
+  }
+})
 
 function handleSubmit(e: Event) {
   e.preventDefault()
@@ -19,6 +34,11 @@ function handleSubmit(e: Event) {
     return
   chat.sendMessage({ text })
   input.value = ''
+}
+
+async function createNewChat() {
+  const { nanoid } = await import('nanoid')
+  router.push(`/ai-chat/chat__${nanoid()}`)
 }
 
 useHead({ title: 'AI Chat · Nuxt AI Chat' })
@@ -40,18 +60,18 @@ useHead({ title: 'AI Chat · Nuxt AI Chat' })
             AI Chat
           </h1>
           <p class="text-sm text-fg-muted">
-            {{ currentChatId ? 'Continue conversation' : 'Loading...' }}
+            {{ isLoadingChat ? 'Loading chat...' : chat.messages.length === 0 ? 'Start a new conversation' : 'Continue conversation' }}
           </p>
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <NuxtLink
-          to="/ai-chat/new"
+        <button
           class="chip px-3 py-2 text-sm"
+          @click="createNewChat"
         >
           <UIcon name="i-heroicons-plus-20-solid" class="mr-1" />
           New Chat
-        </NuxtLink>
+        </button>
         <UBadge color="emerald" variant="soft" size="md" class="rounded-lg">
           <UIcon name="i-heroicons-sparkles-20-solid" class="mr-1" />
           AI SDK
@@ -61,7 +81,10 @@ useHead({ title: 'AI Chat · Nuxt AI Chat' })
 
     <!-- Messages Container -->
     <div class="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
-      <div v-if="isLoadingChat" class="flex items-center justify-center h-full text-center">
+      <div
+        v-if="isLoadingChat"
+        class="flex items-center justify-center h-full text-center"
+      >
         <div class="space-y-2">
           <UIcon name="i-heroicons-arrow-path-20-solid" class="text-4xl text-fg-muted animate-spin mx-auto" />
           <p class="text-fg-muted text-sm">

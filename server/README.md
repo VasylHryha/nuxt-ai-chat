@@ -1,0 +1,123 @@
+# Server Directory
+
+**Server-side code for Nuxt AI Chat application**
+
+## What's Here
+
+This directory contains all backend logic: API routes, database access, authentication, and server utilities.
+
+## Technology Stack
+
+- **Nitro** - Nuxt's server engine
+- **H3** - HTTP event framework
+- **Bun SQLite** (`bun:sqlite`) - Native database driver
+- **JWT (HS256)** - Authentication tokens
+- **Argon2id** - Password hashing
+
+## Directory Structure
+
+```
+server/
+├── api/           # HTTP endpoints (RESTful + AI streaming)
+├── db/            # Database queries and schema
+├── middleware/    # Request interceptors (auth, logging)
+└── utils/         # Auto-imported helpers (JWT, password, validators)
+```
+
+## Auto-Imports (IMPORTANT)
+
+All files in `server/utils/*.ts` are **auto-imported globally** by Nuxt.
+
+**You can use these WITHOUT importing:**
+- `hashPassword()`, `verifyPassword()`
+- `signJWT()`, `verifyJWT()`
+- `setAccessCookie()`, `getTokenFromRequest()`, `requireUser()`
+- `safeValidate()`, `loginSchema`, `signupSchema`
+
+**You MUST manually import:**
+- Database functions from `server/db/*.ts`
+- Types and interfaces
+- Third-party packages
+
+## Request Flow
+
+```
+1. HTTP Request
+   ↓
+2. Middleware (00.logs.ts → 01.auth.ts)
+   ↓
+3. API Route Handler
+   ↓
+4. Database Queries (if needed)
+   ↓
+5. Response
+```
+
+## Authentication Flow
+
+**Every API request goes through:**
+1. `middleware/01.auth.ts` verifies JWT from cookie or header
+2. Attaches `event.context.user` if valid
+3. Route handlers use `requireUser(event)` to enforce auth
+
+**Login creates:**
+- JWT token (15min TTL)
+- httpOnly cookie (`access_token`)
+- Returns token + user object
+
+## Key Patterns
+
+### Event Handler
+```typescript
+export default defineEventHandler(async (event) => {
+  const authUser = requireUser(event) // Throws 401 if not authenticated
+  const body = await readBody(event)  // Parse request body
+
+  // Your logic here
+
+  return { data: 'response' }
+})
+```
+
+### Lazy Event Handler (for DB connections)
+```typescript
+export default defineLazyEventHandler(async () => {
+  // Setup once (DB connections, provider clients)
+  const client = createClient()
+
+  return defineEventHandler(async (event) => {
+    // Handle each request
+  })
+})
+```
+
+## Error Handling
+
+```typescript
+// User-friendly errors
+throw createError({
+  statusCode: 400,
+  statusMessage: 'Invalid input'
+})
+
+// Log details internally
+console.error('[Component] Error details:', error)
+```
+
+## Environment Variables
+
+Accessed via `useRuntimeConfig()`:
+
+```typescript
+const config = useRuntimeConfig()
+config.jwtSecret           // Private (server-only)
+config.openaiApiKey        // Private
+config.public.openaiModel  // Public (client-accessible)
+```
+
+## See Also
+
+- [server/api/README.md](./api/README.md) - API routes
+- [server/db/README.md](./db/README.md) - Database layer
+- [server/middleware/README.md](./middleware/README.md) - Request middleware
+- [server/utils/README.md](./utils/README.md) - Helper functions

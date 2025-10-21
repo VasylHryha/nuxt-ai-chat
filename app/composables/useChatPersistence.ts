@@ -36,6 +36,12 @@ export function useChatPersistence() {
     try {
       // Save messages sequentially to preserve order
       for (const message of messages) {
+        // Validate message before sending
+        if (!message.role || !message.content) {
+          console.error('[Chat Persistence] Invalid message:', { role: message.role, contentLength: message.content?.length })
+          throw new Error(`Invalid message: role=${message.role}, content=${message.content ? 'exists' : 'missing'}`)
+        }
+
         await $fetch(`/api/v1/chats/${chatId}/messages`, {
           method: 'POST',
           body: {

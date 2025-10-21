@@ -18,8 +18,8 @@ export default defineEventHandler(async (event) => {
   if (!cfg.jwtSecret)
     throw createError({ statusCode: 500, statusMessage: 'JWT_SECRET missing' })
 
-  const ttlSec = 60 * 60 // 1 hour
-  const token = signJWT(
+  const ttlSec = 60 * 15 // 15 minutes
+  const token = await signJWT(
     { sub: record.user.id, email: record.user.email },
     { secret: cfg.jwtSecret, expiresInSec: ttlSec, issuer: 'nuxt-ai-chat' },
   )

@@ -1,9 +1,10 @@
 import { createError, defineEventHandler, getRequestURL } from 'h3'
 import { getTokenFromRequest } from '@/server/utils/auth'
-// server/middleware/00.auth.ts
+// server/middleware/01.auth.ts
 
 const PUBLIC_PREFIXES = [
-  '/api/v1/auth', // login/signup/me/logout
+  '/api/v1/auth/login',
+  '/api/v1/auth/signup',
   '/api/public', // any public APIs you expose
   '/api/_nuxt_icon', // nuxt-icon asset proxy
   '/favicon.ico',
@@ -21,22 +22,18 @@ declare module 'h3' {
   }
 }
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const url = getRequestURL(event)
 
   if (!url?.pathname || isPublic(url.pathname)) {
-    // console.log('auth', url?.pathname, url)
-    // logger.debug?.(`auth skip: ${url.pathname}`)
     return
   }
 
   const { jwtSecret } = useRuntimeConfig()
   if (!jwtSecret) {
-    // Fail fast in dev; in prod you want this set
     throw createError({ statusCode: 500, statusMessage: 'JWT_SECRET missing' })
   }
 
-  // Extract token from Authorization: Bearer ... OR secure httpOnly cookie
   const token = getTokenFromRequest(event)
 
   if (!token) {
@@ -44,7 +41,7 @@ export default defineEventHandler((event) => {
   }
 
   try {
-    const payload = verifyJWT(token, jwtSecret, { issuer: 'nuxt-ai-chat' })
+    const payload = await verifyJWT(token, jwtSecret, { issuer: 'nuxt-ai-chat' })
     event.context.user = {
       id: String(payload.sub),
       email: String(payload.email || ''),

@@ -17,8 +17,8 @@ export default defineEventHandler(async (event) => {
     const { jwtSecret } = useRuntimeConfig()
     if (!jwtSecret)
       throw new Error('JWT_SECRET missing')
-    const ttlSec = 3600
-    const token = signJWT({ sub: user.id, email: user.email }, { secret: jwtSecret, expiresInSec: ttlSec, issuer: 'nuxt-ai-chat' })
+    const ttlSec = 60 * 15 // 15 minutes
+    const token = await signJWT({ sub: user.id, email: user.email }, { secret: jwtSecret, expiresInSec: ttlSec, issuer: 'nuxt-ai-chat' })
     setAccessCookie(event, token, ttlSec)
 
     return {

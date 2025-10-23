@@ -129,8 +129,8 @@ async function handleLogout() {
 
           <!-- Login button (when not authenticated) -->
           <UButton
-              v-else-if="route.path !== '/chats/login'"
-              to="/chats/login"
+              v-else-if="route.path !== '/login'"
+              to="/login"
               color="emerald"
               variant="soft"
               class="rounded-xl"

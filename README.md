@@ -25,15 +25,24 @@ This starter is designed for:
 ## Tech Stack
 
 - **Frontend**: Nuxt 4, Vue 3 (Composition API), Pinia, Nuxt UI, Tailwind v4
-- **Backend**: Nitro, H3, Vercel AI SDK, better-sqlite3
+- **Backend**: Nitro, H3, Vercel AI SDK, Bun native SQLite (`bun:sqlite`)
 - **Auth**: Custom JWT (HS256), @node-rs/argon2 password hashing
-- **AI Providers**: OpenAI, Anthropic, Google (via AI SDK and HTTP proxies)
-- **Runtime**: Bun (recommended) or Node.js
+- **AI Providers**: OpenAI, Anthropic, Google, OpenRouter (via AI SDK and HTTP proxies)
+- **Runtime**: Bun (required for native SQLite)
 - **Database**: SQLite with migrations and seed scripts
 
 Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) and [docs/AI_AGENT_BRIEF.md](./docs/AI_AGENT_BRIEF.md) to learn more about this project's architecture.
 
+## Prerequisites
+
+Before starting, ensure you have:
+- **Bun** v1.1.0 or higher ([install](https://bun.sh/docs/installation))
+- At least one AI provider API key (OpenAI, OpenRouter, etc.)
+- Basic knowledge of Nuxt/Vue and TypeScript
+
 ## Quick Start
+
+Follow these steps to get the app running locally:
 
 ### 1. Install Dependencies
 
@@ -53,21 +62,31 @@ yarn install
 
 ### 2. Configure Environment Variables
 
-Create a `.env` file in the project root:
+Create a `.env.local` file in the project root (or `.env` for production):
 
 ```bash
-# Database
-DATABASE_URL=./db/sqlite/dev.db
+# Database (absolute path to SQLite file)
+NUXT_DB_PATH=/absolute/path/to/db/sqlite/app.db
+# Or use relative path (default: ./db/sqlite/app.db)
 
 # JWT Secret (generate with: openssl rand -base64 32)
-JWT_SECRET=your-secret-key-here
+NUXT_JWT_SECRET=your-secret-key-here
 
 # AI Provider Keys (add the ones you plan to use)
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_API_KEY=...
-OPENROUTER_API_KEY=sk-or-...
+NUXT_OPENAI_API_KEY=sk-...
+NUXT_OPENROUTER_API_KEY=sk-or-...
+NUXT_TAVILY_API_KEY=tvly-...
+
+# Optional: For agent tools with web search
+NUXT_BRAVE_API_KEY=BSA...
+
+# Public config (optional - has defaults)
+NUXT_PUBLIC_OPENAI_MODEL=gpt-4o-mini
+NUXT_PUBLIC_OPENROUTER_MODEL=deepseek/deepseek-r1:free
+NUXT_PUBLIC_APP_TITLE=Nuxt AI Chat
 ```
+
+**Note**: Nuxt uses `NUXT_` prefix for runtime config. The dev server reads from `.env.local` by default.
 
 ### 3. Initialize Database
 
@@ -76,12 +95,12 @@ Run migrations to create the database schema:
 bun run db:migrate
 ```
 
-Optionally, seed with a test user:
+Seed with a test user:
 ```bash
-bun run db/scripts/seeds.js your-email@example.com
+bun run db:seed your-email@example.com
 ```
 
-This creates a user with password `"password"` for testing.
+This creates a user account for the specified email. You'll need to use the signup endpoint to set a password.
 
 ### 4. Start Development Server
 
@@ -177,22 +196,24 @@ For providers needing streaming, tool calling, or complex features, see `docs/AI
 
 ```bash
 # Development
-bun run dev              # Start dev server
+bun run dev              # Start dev server (reads .env.local)
 
 # Database
 bun run db:migrate       # Run database migrations
-bun run db/scripts/seeds.js <email>  # Seed test user
+bun run db:seed <email>  # Seed test user
+bun run db:reset         # Reset database (delete + migrate)
 
 # Production
 bun run build            # Build for production
 bun run preview          # Preview production build
 
 # Code Quality
-bunx eslint . --fix      # Lint and fix code style
+bun run lint             # Check code style
+bun run lint:fix         # Lint and fix code style
 bunx tsc --noEmit        # Type check without emitting files
 
 # Testing (coming soon)
-bunx nuxt test           # Run test suite with Vitest
+bun test                 # Run test suite with Vitest
 ```
 
 ## Testing
@@ -257,6 +278,60 @@ This starter is designed to evolve. Potential enhancements:
 - 🌐 **i18n** - Multi-language support
 - 🎭 **Roles & Permissions** - Admin/user role management
 - 💬 **WebSocket Chat** - Real-time collaborative features
+
+## Troubleshooting
+
+### Database Issues
+
+**Problem**: Migration fails or database not found
+```bash
+# Solution: Ensure directory exists
+mkdir -p db/sqlite
+
+# Reset and recreate database
+bun run db:reset
+```
+
+**Problem**: "SQLITE_BUSY: database is locked"
+```bash
+# Solution: Stop dev server and delete .db-wal and .db-shm files
+rm db/sqlite/app.db-wal db/sqlite/app.db-shm
+```
+
+### Environment Variable Issues
+
+**Problem**: API key not found or undefined
+- Verify `.env.local` file exists in project root
+- Ensure keys have `NUXT_` prefix (e.g., `NUXT_OPENAI_API_KEY`)
+- Restart dev server after changing `.env.local`
+
+**Problem**: JWT errors on login
+```bash
+# Solution: Generate a new secret
+openssl rand -base64 32
+# Add to .env.local as NUXT_JWT_SECRET
+```
+
+### Bun-Specific Issues
+
+**Problem**: "bun:sqlite" module not found
+- Ensure you're using Bun v1.1.0 or higher: `bun --version`
+- Do not use `--bun` flag with `nuxt dev` command
+
+**Problem**: Native module conflicts
+- This project uses Bun's native SQLite, not `better-sqlite3`
+- If you see native module errors, ensure you're running with Bun, not Node
+
+### Development Server Issues
+
+**Problem**: Port 3000 already in use
+```bash
+# Find and kill the process
+lsof -ti:3000 | xargs kill -9
+
+# Or use a different port
+PORT=3001 bun run dev
+```
 
 ## Documentation
 

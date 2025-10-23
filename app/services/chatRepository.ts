@@ -1,6 +1,5 @@
 import type { ChatMessage, DirectorySnapshot, Profile, Session } from '~/types'
 // app/services/chatRepository.ts
-import { $fetch } from 'ofetch'
 
 const STORAGE_KEY = 'ai-chat.v1.directory'
 

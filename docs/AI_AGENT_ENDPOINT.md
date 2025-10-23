@@ -2,11 +2,11 @@
 
 ## Overview
 
-The Agent endpoint (`POST /api/v1/ai/chats/[id]/agent`) is an **advanced AI chat endpoint** that extends basic chat capabilities with autonomous tool calling and multi-step reasoning. Unlike the basic chat endpoint, the agent can automatically search the web, perform calculations, fetch web pages, handle dates, and more - all without explicit instructions.
+The Agent endpoint (`POST /api/v1/ai/agents`) is an **advanced AI chat endpoint** that extends basic chat capabilities with autonomous tool calling and multi-step reasoning. Unlike the basic chat endpoint, the agent can automatically search the web, perform calculations, fetch web pages, handle dates, and more - all without explicit instructions.
 
-**Endpoint:** `POST /api/v1/ai/chats/[id]/agent`
+**Endpoint:** `POST /api/v1/ai/agents`
 
-**Status:** ✅ Production-ready, optimized for `gpt-4o-mini` and `gpt-5-nano`
+**Status:** ✅ Production-ready, optimized for `gpt-4o-mini`
 
 ---
 

@@ -64,13 +64,14 @@ export default defineNuxtConfig({
     jwtSecret: '',
     dbPath: '',
     tavilyApiKey: '',
+    braveApiKey: '', // For agent web search tool
     public: {
       openrouterBase: 'https://openrouter.ai/api/v1',
       openrouterModel: 'deepseek/deepseek-r1:free',
       openaiBase: 'https://api.openai.com/v1',
-      openaiModel: 'gpt-5-nano',
-      appTitle: 'Nuxt Chat',
-      defaultProvider: 'nuxt',
+      openaiModel: 'gpt-4o-mini',
+      appTitle: 'Nuxt AI Chat',
+      defaultProvider: 'openai',
     },
   },
 })

@@ -11,7 +11,9 @@ RESTful API routes and AI streaming endpoints. All routes require authentication
 ```
 /api/v1/
 ├── ai/                              # Vercel AI SDK endpoints (RECOMMENDED)
-│   ├── chats/index.post.ts          # POST /api/v1/ai/chats - Stream chat with persistence
+│   ├── chats/index.post.ts          # POST /api/v1/ai/chats - Basic AI SDK streaming
+│   ├── tools/index.post.ts          # POST /api/v1/ai/tools - AI SDK with tools (weather, search)
+│   ├── agents/index.post.ts         # POST /api/v1/ai/agents - AI agents with web search
 │   └── completions/index.post.ts    # POST /api/v1/ai/completions - Text completion
 │
 ├── auth/                            # Authentication
@@ -141,7 +143,7 @@ Same as signup, but validates existing credentials.
 ### AI SDK Routes (`/api/v1/ai/`) ✅ RECOMMENDED
 
 #### POST `/api/v1/ai/chats`
-**Streaming chat with automatic persistence**
+**Basic AI SDK streaming (no tools)**
 
 **Request:**
 ```json
@@ -152,47 +154,125 @@ Same as signup, but validates existing credentials.
     { "id": "msg3", "role": "user", "parts": [{ "type": "text", "text": "How are you?" }] }
   ],
   "model": "gpt-4o-mini",
-  "id": "chat_abc123"  // chatId, required for persistence
+  "id": "chat_abc123"  // chatId, optional for persistence
 }
 ```
 
-**Response:** StreamingTextResponse (Fetch-compatible stream)
+**Response:** UIMessageStreamResponse (Fetch-compatible stream)
 
-**Implementation:**
+#### POST `/api/v1/ai/tools`
+**AI SDK with tool calling (weather, Tavily search, etc.)**
+
+**Request:**
+```json
+{
+  "messages": [
+    { "id": "msg1", "role": "user", "parts": [{ "type": "text", "text": "What's the weather in SF?" }] }
+  ],
+  "model": "gpt-4o-mini",
+  "id": "chat_abc123",  // chatId, optional
+  "maxSteps": 5         // Max tool calling iterations (default: 5)
+}
+```
+
+**Response:** UIMessageStreamResponse with tool calls
+
+**Available tools:**
+- `weatherTool` - Get current weather for a location
+- `convertFahrenheitToCelsius` - Temperature conversion
+- `tavilySearchTool` - Web search using Tavily API
+- `summarizeTool` - Text summarization
+
+#### POST `/api/v1/ai/agents`
+**AI agents with advanced tools (web search, calculator, etc.)**
+
+**Request:**
+```json
+{
+  "messages": [
+    { "id": "msg1", "role": "user", "parts": [{ "type": "text", "text": "Search for latest AI news" }] }
+  ],
+  "model": "gpt-4o-mini",
+  "id": "chat_abc123",  // chatId, optional
+  "maxSteps": 5         // Max agent loop iterations (default: 5)
+}
+```
+
+**Response:** UIMessageStreamResponse with tool calls and results
+
+**Available tools:**
+- `web_search` - Brave Search API for current web information
+- `web_fetch` - Fetch and extract content from URLs
+- `calculator` - Mathematical calculations (supports +, -, *, /, sqrt, π, %)
+- `date_time` - Date/time parsing and calculations (timezone: Europe/Kyiv)
+- `summarize` - Text summarization with style options
+- `knowledge_base` - Local knowledge base search (placeholder)
+
+**Common Implementation Pattern:**
 ```typescript
 import { streamText, convertToModelMessages } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 
-const authUser = requireUser(event)
-const chat = chatId ? getChatById(chatId, authUser.id) : null
-if (chatId && !chat) {
-  throw createError({ statusCode: 404, statusMessage: 'Chat not found' })
-}
+export default defineLazyEventHandler(async () => {
+  const apiKey = useRuntimeConfig().openaiApiKey
+  const openai = createOpenAI({ apiKey })
 
-const result = streamText({
-  model: openai(model),
-  messages: convertToModelMessages(messages)
-})
+  return defineEventHandler(async (event) => {
+    const authUser = requireUser(event)
+    const { messages, model, id: chatId } = await readBody(event)
 
-return result.toUIMessageStreamResponse({
-  originalMessages: messages,
-  async onFinish({ messages: finalMessages }) {
-    if (chatId && !getChatById(chatId, authUser.id)) {
-      throw createError({ statusCode: 404, statusMessage: 'Chat not found' })
-    }
-    // Save new messages to database
-    const newMessages = finalMessages.slice(messages.length - 1)
-    for (const msg of newMessages) {
-      insertMessage({ chatId, role: msg.role, content: msg.content })
-    }
-  }
+    const result = streamText({
+      model: openai(model || 'gpt-4o-mini'),
+      messages: convertToModelMessages(messages)
+    })
+
+    return result.toUIMessageStreamResponse({
+      originalMessages: messages,
+      async onFinish({ messages: finalMessages }) {
+        if (!chatId) return // Skip persistence if no chatId
+
+        // Verify chat exists and user owns it
+        const chat = getChatById(chatId, authUser.id)
+        if (!chat) {
+          console.error('[AI Chat] Chat not found or unauthorized:', chatId)
+          return
+        }
+
+        // Save new messages to database
+        const existingMessages = messages.length - 1
+        const newMessages = finalMessages.slice(existingMessages)
+
+        for (const msg of newMessages) {
+          if (msg.role === 'user' || msg.role === 'assistant') {
+            const content = msg.parts
+              .filter(p => p.type === 'text')
+              .map(p => p.text)
+              .join('\n')
+
+            if (content.trim()) {
+              insertMessage({
+                chatId,
+                role: msg.role,
+                content: content.trim(),
+                providerGenerationId: msg.id
+              })
+            }
+          }
+        }
+
+        updateChatTimestamp(chatId, authUser.id)
+      }
+    })
+  })
 })
 ```
 
 **Key features:**
-- ✅ Handles SSE streaming automatically
-- ✅ Persists messages after streaming completes
+- ✅ Uses `defineLazyEventHandler` for one-time provider setup
+- ✅ Handles SSE streaming automatically via AI SDK
+- ✅ Persists messages after streaming completes (optional via chatId)
 - ✅ Converts `UIMessage[]` ↔ model format
+- ✅ Verifies chat ownership before persisting
 - ✅ Provider-agnostic (easy to add Anthropic, Google, etc.)
 
 #### POST `/api/v1/ai/completions`

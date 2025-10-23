@@ -36,7 +36,8 @@ bun run dev                          # Start dev server (http://localhost:3000)
 
 # Database
 bun run db:migrate                   # Run migrations (creates schema)
-bun db:seed <email>                  # Seed test user (password: "password")
+bun run db:seed <email>              # Seed test user
+bun run db:reset                     # Reset database (delete + migrate)
 
 # Production
 bun run build                        # Build for production
@@ -593,23 +594,30 @@ const resource = await getMyResource('123')
 
 ## Environment Variables
 
-Required in `.env`:
+Required in `.env.local` (development) or `.env` (production):
 
 ```bash
-# Database
-DATABASE_URL=./db/sqlite/dev.db
+# Database (absolute path recommended, or relative from project root)
+NUXT_DB_PATH=./db/sqlite/app.db
 
 # JWT Secret (generate with: openssl rand -base64 32)
-JWT_SECRET=your-secret-key-here
+NUXT_JWT_SECRET=your-secret-key-here
 
 # AI Provider Keys (add ones you use)
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_API_KEY=...
-OPENROUTER_API_KEY=sk-or-...
+NUXT_OPENAI_API_KEY=sk-...
+NUXT_OPENROUTER_API_KEY=sk-or-...
+NUXT_TAVILY_API_KEY=tvly-...
+NUXT_BRAVE_API_KEY=BSA...  # Optional: For agent web search
+
+# Public config (optional - has defaults)
+NUXT_PUBLIC_OPENAI_MODEL=gpt-4o-mini
+NUXT_PUBLIC_OPENROUTER_MODEL=deepseek/deepseek-r1:free
+NUXT_PUBLIC_APP_TITLE=Nuxt AI Chat
 ```
 
-**Never commit `.env` to git!**
+**Note**: Nuxt uses `NUXT_` prefix for runtime config. The dev server reads from `.env.local` by default.
+
+**Never commit `.env` or `.env.local` to git!**
 
 ## Common Pitfalls
 

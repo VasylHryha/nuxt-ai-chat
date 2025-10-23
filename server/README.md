@@ -26,17 +26,28 @@ server/
 
 ## Auto-Imports (IMPORTANT)
 
+### Server Utils (Auto-imported)
 All files in `server/utils/*.ts` are **auto-imported globally** by Nuxt.
 
 **You can use these WITHOUT importing:**
 - `hashPassword()`, `verifyPassword()`
 - `signJWT()`, `verifyJWT()`
 - `setAccessCookie()`, `getTokenFromRequest()`, `requireUser()`
-- `safeValidate()`, `loginSchema`, `signupSchema`
+- `safeValidate()`, `loginSchema`, `signupSchema`, `createChatSchema`
+- `rid()` - ID generation helper
 
+### Shared Types (Auto-imported)
+All types in `shared/types/*.ts` are **auto-imported** on both client and server.
+
+**You can use these WITHOUT importing:**
+- `Role`, `ChatMessage`, `Session`, `Profile`, `DirectorySnapshot`
+- `AgentChatRequestBody`, `AiChatRequestBody`
+- `WebSearchResult`, `CalculatorResult`, `DateTimeResult`, etc.
+
+### Must Import Manually
 **You MUST manually import:**
 - Database functions from `server/db/*.ts`
-- Types and interfaces
+- Types from `server/db/types.ts` or `app/types/*.ts`
 - Third-party packages
 
 ## Request Flow
@@ -110,10 +121,17 @@ Accessed via `useRuntimeConfig()`:
 
 ```typescript
 const config = useRuntimeConfig()
-config.jwtSecret           // Private (server-only)
-config.openaiApiKey        // Private
-config.public.openaiModel  // Public (client-accessible)
+config.jwtSecret           // Private (server-only) - NUXT_JWT_SECRET
+config.openaiApiKey        // Private - NUXT_OPENAI_API_KEY
+config.openrouterApiKey    // Private - NUXT_OPENROUTER_API_KEY
+config.tavilyApiKey        // Private - NUXT_TAVILY_API_KEY
+config.braveApiKey         // Private - NUXT_BRAVE_API_KEY (for agents)
+config.dbPath              // Private - NUXT_DB_PATH
+config.public.openaiModel  // Public (client-accessible) - NUXT_PUBLIC_OPENAI_MODEL
+config.public.appTitle     // Public - NUXT_PUBLIC_APP_TITLE
 ```
+
+**Note**: All runtime config vars use `NUXT_` prefix in `.env.local`
 
 ## See Also
 

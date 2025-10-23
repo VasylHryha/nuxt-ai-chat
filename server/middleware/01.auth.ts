@@ -46,7 +46,6 @@ export default defineEventHandler(async (event) => {
       id: String(payload.sub),
       email: String(payload.email || ''),
     }
-    console.info(`auth ok: ${event.context.user.email} -> ${url.pathname}`)
   }
   catch (error: unknown) {
     console.warn(`auth failed: ${url.pathname}`)

@@ -1,4 +1,8 @@
-// composables/useChatPersistence.ts
+/**
+ * Chat persistence composable
+ * Wraps API client methods with additional validation and error handling
+ */
+import { createChat as apiCreateChat, getChat as apiGetChat } from '@/services/api/chats'
 import { useAuth } from '@/stores/auth'
 
 export function useChatPersistence() {
@@ -6,16 +10,16 @@ export function useChatPersistence() {
 
   /**
    * Create a new chat in the database
+   * Wraps API client with null return on error
    */
-  async function createChat(provider: string, model: string, title: string, ui?: 'ai-sdk' | 'proxy' | 'native'): Promise<string | null> {
+  async function createChat(
+    provider: string,
+    model: string,
+    title: string,
+    ui?: 'ai-sdk' | 'proxy' | 'native',
+  ): Promise<string | null> {
     try {
-      const response = await $fetch<{ id: string }>('/api/v1/chats/create', {
-        method: 'POST',
-        body: { provider, model, title, ui },
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
-
-      return response.id
+      return await apiCreateChat(provider, model, title, ui)
     }
     catch (error) {
       console.error('[Chat Persistence] Failed to create chat:', error)
@@ -38,8 +42,13 @@ export function useChatPersistence() {
       for (const message of messages) {
         // Validate message before sending
         if (!message.role || !message.content) {
-          console.error('[Chat Persistence] Invalid message:', { role: message.role, contentLength: message.content?.length })
-          throw new Error(`Invalid message: role=${message.role}, content=${message.content ? 'exists' : 'missing'}`)
+          console.error('[Chat Persistence] Invalid message:', {
+            role: message.role,
+            contentLength: message.content?.length,
+          })
+          throw new Error(
+            `Invalid message: role=${message.role}, content=${message.content ? 'exists' : 'missing'}`,
+          )
         }
 
         await $fetch(`/api/v1/chats/${chatId}/messages`, {
@@ -60,17 +69,11 @@ export function useChatPersistence() {
 
   /**
    * Load chat with messages from database
+   * Alias for getChat API client
    */
   async function loadChat(chatId: string) {
     try {
-      const response = await $fetch<{
-        chat: any
-        messages: Array<{ id: string, role: string, content: string, createdAt: string }>
-      }>(`/api/v1/chats/${chatId}`, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
-
-      return response
+      return await apiGetChat(chatId)
     }
     catch (error: any) {
       console.error('[Chat Persistence] Failed to load chat:', error)

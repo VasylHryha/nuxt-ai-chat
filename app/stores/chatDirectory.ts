@@ -19,38 +19,30 @@ export const useChatDirectory = defineStore('chatDirectory', () => {
   const errorMessage = ref('')
   const etag = ref<string | null>(null)
   const lastFetchedAt = ref(0)
-  const ttlMs = ref(30_000)
-  const dirty = ref(true)
-  const lastParams = ref<ChatDirectoryParams | null>(null)
+  const ttlMs = ref(30_000) // 30 seconds
+  const dirty = ref(true) // Marks data as stale after mutations
+  const newChatId = ref<string | null>(null) // Track single new chat ID
 
   const list = computed(() => items.value)
   const isStale = computed(() => Date.now() - lastFetchedAt.value > ttlMs.value)
   const totalMessages = computed(() => items.value.reduce((sum, chat) => sum + chat.messageCount, 0))
   const providersUsed = computed(() => new Set(items.value.map(chat => chat.provider)).size)
 
-  function paramsChanged(next: ChatDirectoryParams): boolean {
-    if (!lastParams.value)
-      return true
-
-    return (
-      lastParams.value.email !== next.email
-      || lastParams.value.provider !== next.provider
-      || lastParams.value.startDate !== next.startDate
-    )
-  }
-
   function markDirty() {
     dirty.value = true
   }
 
+  function setNewChatId(chatId: string | null) {
+    newChatId.value = chatId
+  }
+
+  function isNewChat(chatId: string): boolean {
+    return newChatId.value === chatId
+  }
+
   async function ensure(params: ChatDirectoryParams, options: FetchOptions = {}) {
-    const needsFetch = (
-      options.force
-      || dirty.value
-      || !etag.value
-      || paramsChanged(params)
-      || isStale.value
-    )
+    // Skip fetch if data is fresh and not dirty (unless forced)
+    const needsFetch = options.force || dirty.value || isStale.value
 
     if (!needsFetch)
       return
@@ -67,7 +59,6 @@ export const useChatDirectory = defineStore('chatDirectory', () => {
         ifNoneMatch: options.useEtag ? etag.value ?? undefined : undefined,
       })
 
-      lastParams.value = { ...params }
       lastFetchedAt.value = Date.now()
 
       if (fromCache) {
@@ -111,7 +102,7 @@ export const useChatDirectory = defineStore('chatDirectory', () => {
     lastFetchedAt,
     ttlMs,
     dirty,
-    lastParams,
+    newChatId,
     // getters
     list,
     isStale,
@@ -121,5 +112,7 @@ export const useChatDirectory = defineStore('chatDirectory', () => {
     ensure,
     markDirty,
     remove,
+    setNewChatId,
+    isNewChat,
   }
 })

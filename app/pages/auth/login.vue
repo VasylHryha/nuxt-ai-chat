@@ -1,14 +1,17 @@
 <!-- app/pages/auth/login.vue -->
 <script setup lang="ts">
 import { useRoute, useRouter } from '#imports'
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
+import { z } from 'zod'
 import { useAuth } from '@/stores/auth'
 
 definePageMeta({ layout: 'default' })
 useHead({ title: 'Sign in · Nuxt AI Chat' })
 
-const email = ref('')
-const password = ref('')
+const loginForm = reactive({
+  email: '',
+  password: '',
+})
 const show = ref(false) // show/hide password
 const isSubmitting = ref(false)
 const errorMessage = ref('')
@@ -17,23 +20,29 @@ const auth = useAuth()
 const router = useRouter()
 const route = useRoute()
 
-const emailRe = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/
+const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email.').transform(value => value.trim().toLowerCase()),
+  password: z.string().min(1, 'Please enter your password.'),
+})
 
 async function handleLogin() {
   errorMessage.value = ''
-  const clean = email.value.trim().toLowerCase()
-  if (!clean || !emailRe.test(clean)) {
-    errorMessage.value = 'Please enter a valid email.'
-    return
-  }
-  if (!password.value) {
-    errorMessage.value = 'Please enter your password.'
+  const parsed = loginSchema.safeParse({
+    email: loginForm.email,
+    password: loginForm.password,
+  })
+
+  if (!parsed.success) {
+    const [firstError] = parsed.error.issues
+    errorMessage.value = firstError?.message || 'Invalid email or password.'
     return
   }
 
+  loginForm.email = parsed.data.email
+
   isSubmitting.value = true
   try {
-    await auth.login(clean, password.value)
+    await auth.login(parsed.data.email, parsed.data.password)
     const redirectTo = String(route.query.redirect || '/users')
     await router.push(redirectTo)
   }
@@ -76,7 +85,7 @@ onMounted(async () => {
         <div class="p-6 space-y-4">
           <label class="block text-sm text-fg-subtle mb-1">Email</label>
           <input
-            v-model="email"
+            v-model="loginForm.email"
             type="email"
             inputmode="email"
             autocomplete="email"
@@ -88,7 +97,7 @@ onMounted(async () => {
           <label class="block text-sm text-fg-subtle mb-1">Password</label>
           <div class="flex items-stretch gap-2">
             <input
-              v-model="password"
+              v-model="loginForm.password"
               :type="show ? 'text' : 'password'"
               autocomplete="current-password"
               placeholder="••••••••"

@@ -33,7 +33,7 @@ export const useAuth = defineStore('auth', () => {
     isLoading.value = true
     errorMessage.value = ''
     try {
-      console.log('signup', name, email, password)
+      console.error('signup', name, email, password)
       const res = await $fetch<{ token: string, user: AuthUser }>(
         '/api/v1/auth/signup',
         { method: 'POST', body: { name, email, password } },
@@ -43,7 +43,7 @@ export const useAuth = defineStore('auth', () => {
       isInitialized.value = true
     }
     catch (e: any) {
-      console.log(e)
+      console.error(e)
       errorMessage.value = String(e?.statusMessage || e?.message || 'Signup failed')
       throw e
     }

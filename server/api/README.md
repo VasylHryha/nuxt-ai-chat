@@ -12,10 +12,7 @@ RESTful API routes and AI streaming endpoints. All routes require authentication
 /api/v1/
 ├── ai/                              # Vercel AI SDK endpoints (RECOMMENDED)
 │   ├── chats/index.post.ts          # POST /api/v1/ai/chats - Stream chat with persistence
-│   ├── chats/index.get.ts           # GET  /api/v1/ai/chats - List chats (legacy?)
-│   ├── chats/[id]/messages.post.ts  # POST /api/v1/ai/chats/:id/messages
-│   ├── completions/index.post.ts    # POST /api/v1/ai/completions - Text completion
-│   └── index.get.ts                 # GET  /api/v1/ai - Health check
+│   └── completions/index.post.ts    # POST /api/v1/ai/completions - Text completion
 │
 ├── auth/                            # Authentication
 │   ├── login.post.ts                # POST /api/v1/auth/login
@@ -159,12 +156,18 @@ Same as signup, but validates existing credentials.
 }
 ```
 
-**Response:** Server-Sent Events (SSE) stream
+**Response:** StreamingTextResponse (Fetch-compatible stream)
 
 **Implementation:**
 ```typescript
 import { streamText, convertToModelMessages } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
+
+const authUser = requireUser(event)
+const chat = chatId ? getChatById(chatId, authUser.id) : null
+if (chatId && !chat) {
+  throw createError({ statusCode: 404, statusMessage: 'Chat not found' })
+}
 
 const result = streamText({
   model: openai(model),
@@ -174,6 +177,9 @@ const result = streamText({
 return result.toUIMessageStreamResponse({
   originalMessages: messages,
   async onFinish({ messages: finalMessages }) {
+    if (chatId && !getChatById(chatId, authUser.id)) {
+      throw createError({ statusCode: 404, statusMessage: 'Chat not found' })
+    }
     // Save new messages to database
     const newMessages = finalMessages.slice(messages.length - 1)
     for (const msg of newMessages) {

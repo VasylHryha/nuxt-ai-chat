@@ -1,7 +1,8 @@
 <!-- app/pages/auth/signup.vue -->
 <script setup lang="ts">
 import { useRoute, useRouter } from '#imports'
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
+import { z } from 'zod'
 import { useAuth } from '@/stores/auth'
 
 definePageMeta({ layout: 'default' })
@@ -11,40 +12,53 @@ const auth = useAuth()
 const router = useRouter()
 const route = useRoute()
 
-const name = ref('')
-const email = ref('')
-const password = ref('')
-const confirm = ref('')
+const signupForm = reactive({
+  name: '',
+  email: '',
+  password: '',
+  confirm: '',
+})
 const show = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 
-const emailRe = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/
+const signupFormSchema = z.object({
+  name: z.string().trim().min(1, 'Please enter your name.'),
+  email: z.string().email('Please enter a valid email.').transform(value => value.trim().toLowerCase()),
+  password: z.string().min(8, 'Password must be at least 8 characters.'),
+  confirm: z.string(),
+}).superRefine((data, ctx) => {
+  if (data.password !== data.confirm) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['confirm'],
+      message: 'Passwords do not match.',
+    })
+  }
+})
 
 async function handleSignup() {
   errorMessage.value = ''
-  const cleanEmail = email.value.trim().toLowerCase()
-  const cleanName = name.value.trim()
-  if (!cleanName) {
-    errorMessage.value = 'Please enter your name.'
-    return
-  }
-  if (!cleanEmail || !emailRe.test(cleanEmail)) {
-    errorMessage.value = 'Please enter a valid email.'
-    return
-  }
-  if (!password.value || password.value.length < 8) {
-    errorMessage.value = 'Password must be at least 8 characters.'
-    return
-  }
-  if (password.value !== confirm.value) {
-    errorMessage.value = 'Passwords do not match.'
+  const parsed = signupFormSchema.safeParse({
+    name: signupForm.name,
+    email: signupForm.email,
+    password: signupForm.password,
+    confirm: signupForm.confirm,
+  })
+
+  if (!parsed.success) {
+    const [firstError] = parsed.error.issues
+    errorMessage.value = firstError?.message || 'Check the form and try again.'
     return
   }
 
+  // Normalize the form data with Zod transformations
+  signupForm.name = parsed.data.name
+  signupForm.email = parsed.data.email
+
   isSubmitting.value = true
   try {
-    await auth.signup(cleanName, cleanEmail, password.value)
+    await auth.signup(parsed.data.name, parsed.data.email, parsed.data.password)
     const redirectTo = String(route.query.redirect || '/users')
     await router.push(redirectTo)
   }
@@ -73,7 +87,7 @@ async function handleSignup() {
         <div class="p-6 space-y-4">
           <label class="block text-sm text-fg-subtle mb-1">Name</label>
           <input
-            v-model="name"
+            v-model="signupForm.name"
             type="text"
             autocomplete="name"
             placeholder="Jane Doe"
@@ -82,7 +96,7 @@ async function handleSignup() {
 
           <label class="block text-sm text-fg-subtle mb-1">Email</label>
           <input
-            v-model="email"
+            v-model="signupForm.email"
             type="email"
             inputmode="email"
             autocomplete="email"
@@ -93,7 +107,7 @@ async function handleSignup() {
           <label class="block text-sm text-fg-subtle mb-1">Password</label>
           <div class="flex items-stretch gap-2">
             <input
-              v-model="password"
+              v-model="signupForm.password"
               :type="show ? 'text' : 'password'"
               autocomplete="new-password"
               placeholder="At least 8 characters"
@@ -111,7 +125,7 @@ async function handleSignup() {
 
           <label class="block text-sm text-fg-subtle mb-1">Confirm password</label>
           <input
-            v-model="confirm"
+            v-model="signupForm.confirm"
             :type="show ? 'text' : 'password'"
             autocomplete="new-password"
             placeholder="Repeat password"

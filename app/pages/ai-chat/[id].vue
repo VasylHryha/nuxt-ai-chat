@@ -1,31 +1,27 @@
 <script setup lang="ts">
-import { generateId } from 'ai'
 import { useAiChatSession } from '@/composables/useAiChatSession'
 
 const route = useRoute()
-const router = useRouter()
+const directory = useChatDirectory()
+const toast = useToast()
 
-// Get chatId from route or generate new one
-let initialChatId = route.params.id as string
+// Get chatId from route
+const initialChatId = route.params.id as string
 
-// If no id in route, generate one and replace URL
+// Handle legacy /ai-chat/new route (backward compatibility)
 if (!initialChatId || initialChatId === 'new') {
-  initialChatId = `chat__${generateId()}`
-  await router.replace(`/ai-chat/${initialChatId}`)
+  const { createNewChat } = useNewAiChat()
+  await createNewChat()
 }
 
-const { chat, currentChatId, isLoadingChat, loadExistingChatById } = useAiChatSession({
+// Check if this is a new chat (tracked in store)
+const isNewChat = directory.isNewChat(initialChatId)
+
+const { chat, currentChatId, isLoadingChat, chatNotFound, loadError, loadExistingChatById } = useAiChatSession({
   chatId: initialChatId,
 })
 
 const input = ref('')
-
-// Load existing chat if not already loaded
-onMounted(async () => {
-  if (!chat.messages.length && currentChatId.value) {
-    await loadExistingChatById(currentChatId.value)
-  }
-})
 
 function handleSubmit(e: Event) {
   e.preventDefault()
@@ -37,10 +33,33 @@ function handleSubmit(e: Event) {
 }
 
 async function createNewChat() {
-  router.push(`/ai-chat/chat__${generateId()}`)
+  const { createNewChat } = useNewAiChat()
+  await createNewChat()
 }
 
 useHead({ title: 'AI Chat · Nuxt AI Chat' })
+
+// Load existing chat only if it's not a new chat
+onMounted(async () => {
+  if (isNewChat) {
+    // It's a new chat, skip DB load
+    return
+  }
+
+  // Try to load existing chat from DB
+  if (!chat.messages.length && currentChatId.value) {
+    await loadExistingChatById(currentChatId.value)
+
+    // Show toast if chat not found
+    if (chatNotFound.value) {
+      toast.add({
+        title: 'Chat not found',
+        description: 'This chat may have been deleted or the link is incorrect.',
+        color: 'error',
+      })
+    }
+  }
+})
 </script>
 
 <template>
@@ -80,29 +99,16 @@ useHead({ title: 'AI Chat · Nuxt AI Chat' })
 
     <!-- Messages Container -->
     <div class="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
-      <div
-        v-if="isLoadingChat"
-        class="flex items-center justify-center h-full text-center"
-      >
-        <div class="space-y-2">
-          <UIcon name="i-heroicons-arrow-path-20-solid" class="text-4xl text-fg-muted animate-spin mx-auto" />
-          <p class="text-fg-muted text-sm">
-            Loading chat...
-          </p>
-        </div>
-      </div>
-
-      <div
-        v-else-if="chat.messages.length === 0"
-        class="flex items-center justify-center h-full text-center"
-      >
-        <div class="space-y-2">
-          <UIcon name="i-heroicons-chat-bubble-left-right-20-solid" class="text-4xl text-fg-subtle mx-auto" />
-          <p class="text-fg-muted text-sm">
-            Start a conversation
-          </p>
-        </div>
-      </div>
+      <!-- Error States Component -->
+      <ChatErrorStates
+        v-if="isLoadingChat || chatNotFound || loadError || chat.messages.length === 0"
+        :is-loading="isLoadingChat"
+        :chat-not-found="chatNotFound"
+        :load-error="loadError"
+        :is-empty="chat.messages.length === 0"
+        :on-retry="() => loadExistingChatById(currentChatId!)"
+        :on-create-new="createNewChat"
+      />
 
       <div
         v-for="(m, index) in chat.messages"

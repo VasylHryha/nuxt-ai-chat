@@ -3,14 +3,14 @@ import { Buffer } from 'node:buffer'
 import { createEvent } from 'h3'
 import { createRequest, createResponse } from 'node-mock-http'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import streamMessagesHandler from '@/server/api/v1/ai/chats/[id]/messages.post'
+import aiChatsHandler from '@/server/api/v1/ai/chats/index.post'
 import listChatsHandler from '@/server/api/v1/chats/index.get'
 import { createChatForUser } from '@/server/db/chats'
 import { insertUser } from '@/server/db/users'
 
 const streamTextMock = vi.fn()
 vi.mock('ai', () => ({
-  convertToCoreMessages: (rows: any) => rows,
+  convertToModelMessages: (rows: any) => rows,
   streamText: streamTextMock,
 }))
 
@@ -95,15 +95,21 @@ describe('multi-user authorization', () => {
       title: 'Bob stream chat',
     })
 
-    const event = createPostEvent(`/api/v1/ai/chats/${chat.id}/messages`, {
-      content: 'should fail',
+    const event = createPostEvent('/api/v1/ai/chats', {
+      id: chat.id,
       provider: 'openai',
       model: 'gpt-4o',
+      messages: [
+        {
+          id: 'msg-user',
+          role: 'user',
+          parts: [{ type: 'text', text: 'should fail' }],
+        },
+      ],
     })
-    event.context.params = { id: chat.id }
     event.context.user = { id: alice.id, email: alice.email }
 
-    await expect(streamMessagesHandler(event)).rejects.toMatchObject({
+    await expect(aiChatsHandler(event)).rejects.toMatchObject({
       statusCode: 404,
       statusMessage: 'Chat not found',
     })

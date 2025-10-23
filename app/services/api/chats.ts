@@ -1,50 +1,59 @@
+/**
+ * Chat CRUD API client
+ * All chat-related operations (create, read, update, delete)
+ */
 import type { ChatListItem } from '@/types'
-import { handleApiError } from './utils'
+import type { CreateChatResponse, GetChatResponse, ListChatsOptions, ListChatsParams, ListChatsResult } from '@/types/api'
+import { fetchApi, fetchWithEtag, handleApiError } from './utils'
 
-interface ListChatsParams {
-  email: string
-  provider?: string
-  model?: string
-  startDate?: number
-  endDate?: number
+const BASE_URL = '/api/v1/chats'
+
+/**
+ * Create a new chat
+ */
+export async function createChat(
+  provider: string,
+  model: string,
+  title: string,
+  ui: 'ai-sdk' | 'native' | 'proxy' = 'ai-sdk',
+): Promise<string> {
+  const response = await fetchApi<CreateChatResponse>(
+    `${BASE_URL}/create`,
+    {
+      method: 'POST',
+      body: { provider, model, title, ui },
+    },
+  )
+  return response.id
 }
 
-interface ListChatsOptions {
-  ifNoneMatch?: string
+/**
+ * Get chat with all messages
+ */
+export async function getChat(chatId: string): Promise<GetChatResponse> {
+  return fetchApi<GetChatResponse>(`${BASE_URL}/${chatId}`)
 }
 
-export interface ListChatsResult {
-  items: ChatListItem[]
-  etag?: string
-  fromCache: boolean
-}
-
-export async function listChats(params: ListChatsParams, options: ListChatsOptions = {}): Promise<ListChatsResult> {
+/**
+ * List chats with ETag caching support
+ */
+export async function listChats(
+  params: ListChatsParams,
+  options: ListChatsOptions = {},
+): Promise<ListChatsResult> {
   try {
-    const response = await $fetch.raw<ChatListItem[]>('/api/v1/chats', {
-      query: params,
-      headers: options.ifNoneMatch
-        ? {
-            'If-None-Match': options.ifNoneMatch,
-          }
-        : undefined,
-    })
-
-    if (response.status === 304) {
-      return {
-        items: [],
-        etag: options.ifNoneMatch,
-        fromCache: true,
-      }
-    }
-
-    const etag = response.headers.get('ETag') ?? undefined
-    const data = response._data ?? []
+    const { data, etag, fromCache } = await fetchWithEtag<ChatListItem[]>(
+      BASE_URL,
+      {
+        query: params,
+        ifNoneMatch: options.ifNoneMatch,
+      },
+    )
 
     return {
       items: data,
       etag,
-      fromCache: false,
+      fromCache,
     }
   }
   catch (error: any) {
@@ -52,11 +61,12 @@ export async function listChats(params: ListChatsParams, options: ListChatsOptio
   }
 }
 
+/**
+ * Delete a chat
+ */
 export async function deleteChat(chatId: string): Promise<void> {
   try {
-    await $fetch(`/api/v1/chats/${chatId}`, {
-      method: 'DELETE',
-    })
+    await fetchApi(`${BASE_URL}/${chatId}`, { method: 'DELETE' })
   }
   catch (error: any) {
     handleApiError(error)

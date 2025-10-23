@@ -1,6 +1,7 @@
 import type { UIMessage } from 'ai'
 import { Chat } from '@ai-sdk/vue'
 import { createIdGenerator, DefaultChatTransport } from 'ai'
+import { TOOL_API } from '@/constants/ai-sdk'
 import { createChat, getChat } from '@/services/api'
 import { useAuth } from '@/stores/auth'
 
@@ -11,6 +12,7 @@ interface UseAiChatSessionOptions {
 
 export function useAiChatSession(options: UseAiChatSessionOptions = {}) {
   const auth = useAuth()
+  const directory = useChatDirectory()
 
   const provider = ref<'openai' | 'openrouter' | 'anthropic' | 'google'>('openai')
   const model = ref('gpt-4o-mini')
@@ -18,16 +20,21 @@ export function useAiChatSession(options: UseAiChatSessionOptions = {}) {
   const currentChatId = ref<string | null>(options.chatId || null)
   const isLoadingChat = ref(false)
   const isCreatingChat = ref(false)
+  const chatNotFound = ref(false)
+  const loadError = ref<string | null>(null)
 
   const chat = new Chat({
     generateId: createIdGenerator({ prefix: 'msgc', size: 16 }),
     transport: new DefaultChatTransport({
-      api: '/api/v1/ai/chats',
+      api: TOOL_API,
       credentials: 'include',
       headers: () => ({ Authorization: `Bearer ${auth.token}` }),
       async prepareSendMessagesRequest({ messages }) {
         // Create chat on first message if needed
-        if (!currentChatId.value && !isCreatingChat.value) {
+        // Check if this is a new chat (not yet in DB) by checking if it's tracked as "new"
+        const isNewChat = currentChatId.value ? directory.isNewChat(currentChatId.value) : true
+
+        if (isNewChat && !isCreatingChat.value) {
           isCreatingChat.value = true
           try {
             const firstUserMessage = messages.find(m => m.role === 'user')
@@ -41,6 +48,8 @@ export function useAiChatSession(options: UseAiChatSessionOptions = {}) {
               const chatId = await createChat(provider.value, model.value, title, 'ai-sdk')
               if (chatId) {
                 currentChatId.value = chatId
+                // Clear from newChatId store since it's now in DB
+                directory.setNewChatId(null)
                 options.onFirstChatCreated?.(chatId)
               }
             }
@@ -57,6 +66,9 @@ export function useAiChatSession(options: UseAiChatSessionOptions = {}) {
 
   async function loadExistingChatById(chatId: string) {
     isLoadingChat.value = true
+    chatNotFound.value = false
+    loadError.value = null
+
     try {
       const response = await getChat(chatId)
 
@@ -72,6 +84,17 @@ export function useAiChatSession(options: UseAiChatSessionOptions = {}) {
 
       chat.messages.splice(0, chat.messages.length, ...uiMessages)
     }
+    catch (error: any) {
+      // Handle 404 specifically
+      if (error?.message?.includes('404') || error?.statusCode === 404 || error?.message?.includes('not found')) {
+        chatNotFound.value = true
+        loadError.value = 'Chat not found'
+      }
+      else {
+        loadError.value = error?.message || 'Failed to load chat'
+      }
+      console.error('[AI Chat] Failed to load chat:', error)
+    }
     finally {
       isLoadingChat.value = false
     }
@@ -83,6 +106,8 @@ export function useAiChatSession(options: UseAiChatSessionOptions = {}) {
     model,
     currentChatId,
     isLoadingChat,
+    chatNotFound,
+    loadError,
     loadExistingChatById,
   }
 }

@@ -2,7 +2,7 @@
 import { useChatSession } from '@/composables/useChatSession'
 
 const router = useRouter()
-const { chat, currentChatId, isSending, errorMessage } = useChatSession({
+const { chat, isSending, errorMessage } = useChatSession({
   type: 'proxy',
   onFirstChatCreated: id => router.replace(`/proxy-chat/${id}`),
 })

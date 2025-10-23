@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
               if (typeof token === 'string' && token)
                 controller.enqueue(encoder.encode(token))
               else if (payload?.choices?.[0])
-                console.debug('[Google Stream] Received delta:', { choices: payload.choices[0] })
+                console.warn('[Google Stream] Received delta:', { choices: payload.choices[0] })
             }
             catch (err) {
               console.warn('[Google Stream] Parse error:', err)

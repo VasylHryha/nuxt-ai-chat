@@ -9,9 +9,11 @@
  */
 
 import { createOpenAI } from '@ai-sdk/openai'
-import { convertToModelMessages, streamText } from 'ai'
+import { convertToModelMessages, stepCountIs, streamText } from 'ai'
 import { getChatById, updateChatTimestamp } from '@/server/db/chats'
 import { insertMessage } from '@/server/db/messages'
+import { summarizeTool, tavilySearchTool } from '@/server/tools/search'
+import { convertFahrenheitToCelsius, weather } from '@/server/tools/weather'
 
 export default defineLazyEventHandler(async () => {
   const apiKey = useRuntimeConfig().openaiApiKey
@@ -30,6 +32,7 @@ export default defineLazyEventHandler(async () => {
       messages,
       model: requestModel,
       id: chatId,
+      maxSteps = 5,
     } = await readBody<AiChatRequestBody>(event)
 
     // Use model from request, fallback to config
@@ -38,6 +41,24 @@ export default defineLazyEventHandler(async () => {
     const result = streamText({
       model: openai(model),
       messages: convertToModelMessages(messages),
+      tools: {
+        weatherTool: weather,
+        convertFahrenheitToCelsius,
+        tavilySearchTool,
+        summarizeTool,
+      },
+      toolChoice: 'auto',
+      // Use official loop control helper (prevents runaway loops cleanly)
+      stopWhen: stepCountIs(maxSteps),
+      // Optional step callback (debug/metrics)
+      onStepFinish: ({ toolCalls, toolResults, finishReason, usage }) => {
+        console.log('[AI Agent] Step:', {
+          toolCalls: toolCalls.length,
+          toolResults: toolResults.length,
+          finishReason,
+          usage,
+        })
+      },
     })
 
     return result.toUIMessageStreamResponse({

@@ -71,7 +71,7 @@ export default defineEventHandler(async (event) => {
               if (typeof token === 'string' && token)
                 controller.enqueue(encoder.encode(token))
               else if (payload?.delta && payload.delta.type === 'text_delta')
-                console.debug('[Anthropic Stream] Received delta:', { type: payload.delta.type, text: payload.delta.text?.slice(0, 50) })
+                console.warn('[Anthropic Stream] Received delta:', { type: payload.delta.type, text: payload.delta.text?.slice(0, 50) })
             }
             catch (err) {
               console.warn('[Anthropic Stream] Parse error:', err)

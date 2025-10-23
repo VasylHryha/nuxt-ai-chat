@@ -1,3 +1,7 @@
 <script setup lang="ts">
-await navigateTo('/ai-chat/new', { replace: true })
+import { generateId } from 'ai'
+
+// Generate new chat ID and navigate with state
+const newChatId = `chat__${generateId()}`
+await navigateTo(`/ai-chat/${newChatId}`)
 </script>

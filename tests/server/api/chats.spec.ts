@@ -1,9 +1,9 @@
 import type { Mock } from 'vitest'
 import { Buffer } from 'node:buffer'
-import { createEvent } from 'h3'
+import { createError, createEvent } from 'h3'
 import { createRequest, createResponse } from 'node-mock-http'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import streamMessagesHandler from '@/server/api/v1/ai/chats/[id]/messages.post'
+import aiChatsHandler from '@/server/api/v1/ai/chats/index.post'
 import listChatsHandler from '@/server/api/v1/chats/index.get'
 import proxyChatHandler from '@/server/api/v1/chats/index.post'
 import { createChatForUser } from '@/server/db/chats'
@@ -12,7 +12,7 @@ import { insertUser } from '@/server/db/users'
 
 const streamTextMock = vi.fn()
 vi.mock('ai', () => ({
-  convertToCoreMessages: (rows: any) => rows,
+  convertToModelMessages: (rows: any) => rows,
   streamText: streamTextMock,
 }))
 
@@ -170,28 +170,41 @@ describe('chat API endpoints', () => {
       title: 'Streaming demo',
     })
 
-    streamTextMock.mockResolvedValueOnce({
-      stream: (async function* () {
-        yield { type: 'response-metadata', id: 'gen_123' }
-        yield { type: 'text-delta', textDelta: 'Hello' }
-        yield { type: 'text-delta', textDelta: ' world' }
-      })(),
+    streamTextMock.mockReturnValueOnce({
+      toUIMessageStreamResponse: async ({ onFinish }) => {
+        await onFinish({
+          messages: [
+            {
+              id: 'msg-user',
+              role: 'user',
+              parts: [{ type: 'text', text: 'Test prompt' }],
+            },
+            {
+              id: 'gen_123',
+              role: 'assistant',
+              parts: [{ type: 'text', text: 'Hello world' }],
+            },
+          ],
+        })
+        return { ok: true } as any
+      },
     })
 
-    const event = createPostEvent(`/api/v1/ai/chats/${chat.id}/messages`, {
-      content: 'Test prompt',
+    const event = createPostEvent('/api/v1/ai/chats', {
+      id: chat.id,
       provider: 'openai',
       model: 'gpt-4o-mini',
+      messages: [
+        {
+          id: 'msg-user',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Test prompt' }],
+        },
+      ],
     })
-    event.context.params = { id: chat.id }
     event.context.user = { id: user.id, email: user.email }
 
-    await streamMessagesHandler(event)
-
-    expect(event.node.res.getHeader('content-type')).toBe('text/event-stream')
-    expect(event.node.res.getHeader('cache-control')).toBe('no-cache, no-transform')
-    const ssePayload = event.node.res._getString()
-    expect(ssePayload).toBe('data: {"text":"Hello"}\n\ndata: {"text":" world"}\n\nevent: done\ndata:\n\n')
+    await aiChatsHandler(event)
 
     const messages = db.prepare('SELECT role, content, provider_generation_id FROM messages WHERE chat_id=? ORDER BY created_at ASC').all(chat.id) as Array<{ role: string, content: string, provider_generation_id: string | null }>
     expect(messages).toHaveLength(2)
@@ -216,31 +229,35 @@ describe('chat API endpoints', () => {
     })
 
     const streamError = new Error('stream boom')
-    streamTextMock.mockResolvedValueOnce({
-      stream: (async function* () {
-        yield { type: 'text-delta', textDelta: 'partial' }
-        throw streamError
-      })(),
+    streamTextMock.mockReturnValueOnce({
+      toUIMessageStreamResponse: () => {
+        throw createError({ statusCode: 502, statusMessage: 'Provider stream failed', data: streamError })
+      },
     })
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const event = createPostEvent(`/api/v1/ai/chats/${chat.id}/messages`, {
-      content: 'Trigger failure',
+    const event = createPostEvent('/api/v1/ai/chats', {
+      id: chat.id,
       provider: 'openai',
       model: 'gpt-4o-mini',
+      messages: [
+        {
+          id: 'msg-user',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Trigger failure' }],
+        },
+      ],
     })
-    event.context.params = { id: chat.id }
     event.context.user = { id: user.id, email: user.email }
 
-    await expect(streamMessagesHandler(event)).rejects.toMatchObject({
+    await expect(aiChatsHandler(event)).rejects.toMatchObject({
       statusCode: 502,
       statusMessage: 'Provider stream failed',
     })
 
     const messages = db.prepare('SELECT role, content FROM messages WHERE chat_id=? ORDER BY created_at ASC').all(chat.id) as Array<{ role: string, content: string }>
-    expect(messages).toHaveLength(1)
-    expect(messages[0]).toMatchObject({ role: 'user', content: 'Trigger failure' })
+    expect(messages).toHaveLength(0)
 
     consoleSpy.mockRestore()
   })

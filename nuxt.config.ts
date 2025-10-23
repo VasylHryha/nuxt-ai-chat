@@ -63,6 +63,7 @@ export default defineNuxtConfig({
     openaiApiKey: '',
     jwtSecret: '',
     dbPath: '',
+    tavilyApiKey: '',
     public: {
       openrouterBase: 'https://openrouter.ai/api/v1',
       openrouterModel: 'deepseek/deepseek-r1:free',

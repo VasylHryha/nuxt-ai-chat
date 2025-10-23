@@ -67,7 +67,7 @@ export default defineEventHandler(async (event) => {
               }
               else if (payload?.choices?.[0]) {
                 // Log unexpected format for debugging (helps identify API changes)
-                console.debug('[OpenAI Stream] Unexpected delta format:', { payload: JSON.stringify(payload).slice(0, 200) })
+                console.warn('[OpenAI Stream] Unexpected delta format:', { payload: JSON.stringify(payload).slice(0, 200) })
               }
             }
             catch (err) {

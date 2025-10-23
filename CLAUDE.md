@@ -27,6 +27,8 @@ This is a **Nuxt 4 AI Chat Starter** demonstrating secure multi-provider AI inte
 
 ## Development Commands
 
+**🚨 CRITICAL: AI must NEVER run lint or type check commands. These are the developer's responsibility!**
+
 ```bash
 # Development
 bun run dev                          # Start dev server (http://localhost:3000)
@@ -40,7 +42,7 @@ bun db:seed <email>                  # Seed test user (password: "password")
 bun run build                        # Build for production
 bun run preview                      # Preview production build
 
-# Code Quality
+# Code Quality (DEVELOPER ONLY - AI must NOT run these)
 bunx eslint . --fix                  # Lint and fix code
 bunx tsc --noEmit                    # Type check (no emit)
 
@@ -133,6 +135,12 @@ const sessions = useChatSessions()  // Use store
 - `stores/*.ts` → Pinia stores (via `useStoreName()`)
 - `components/*.vue` → Vue components
 
+**Shared types auto-imports (Client & Server):**
+- `shared/types/*.ts` → All types globally available on both client and server
+- Examples: `Role`, `ChatMessage`, `Session`, `Profile`, `DirectorySnapshot`
+- API types: `AgentChatRequestBody`, `WebSearchResult`, `CalculatorResult`, etc.
+- **Never manually import these types** - Nuxt auto-imports them everywhere
+
 ```typescript
 // ✅ Good: Let Nuxt auto-import
 export default defineEventHandler(async (event) => {
@@ -146,7 +154,7 @@ import { hashPassword } from '@/server/utils/password'  // NOT NEEDED!
 
 **When you DO need imports:**
 - Database functions from `server/db/*.ts`
-- Types and interfaces
+- Types from `server/db/types.ts` or `app/types/*.ts` (NOT from `shared/types/*.ts` - those are auto-imported)
 - Third-party packages
 
 ### Dual-Layer Auth Protection
@@ -605,19 +613,20 @@ OPENROUTER_API_KEY=sk-or-...
 
 ## Common Pitfalls
 
-1. **Manual imports of auto-imported utils** - Causes issues, let Nuxt handle it
-2. **Trusting headers/query for auth** - Always use `event.context.user` from middleware
-3. **Exposing secrets in responses** - Return clean DTOs only
-4. **Using `any` type** - Use `unknown` in catch blocks, proper types elsewhere
-5. **Skipping tests** - Add tests for all new features
-6. **Not reading AI_PLAYBOOK.md first** - It contains critical patterns and rules
-7. **Using separate native/proxy composables** - Use unified `useChatSession({ type })` instead
-8. **Parsing SSE streams manually** - Use `streamFromEndpoint()` utility function
-9. **Not checking provider-specific fallback support** - Native has fallback, proxy does not; check before attempting
-10. **Manually attaching auth headers** - Plugin handles it globally, don't call `getAuthHeader()`
-11. **Repeating error handling logic** - Use `handleApiError()` from `app/services/api/utils.ts`
-12. **Creating API clients without types** - Define types in `app/types/api.ts`, import them
-13. **Using try-catch in API client** - Use `fetchApi()` or `fetchStream()` wrappers instead
+1. **🚨 Running lint or type checks** - AI must NEVER run `bunx eslint` or `bunx tsc`. These are the developer's responsibility!
+2. **Manual imports of auto-imported utils/types** - Causes issues, let Nuxt handle it (includes `server/utils/*` and `shared/types/*`)
+3. **Trusting headers/query for auth** - Always use `event.context.user` from middleware
+4. **Exposing secrets in responses** - Return clean DTOs only
+5. **Using `any` type** - Use `unknown` in catch blocks, proper types elsewhere
+6. **Skipping tests** - Add tests for all new features
+7. **Not reading AI_PLAYBOOK.md first** - It contains critical patterns and rules
+8. **Using separate native/proxy composables** - Use unified `useChatSession({ type })` instead
+9. **Parsing SSE streams manually** - Use `streamFromEndpoint()` utility function
+10. **Not checking provider-specific fallback support** - Native has fallback, proxy does not; check before attempting
+11. **Manually attaching auth headers** - Plugin handles it globally, don't call `getAuthHeader()`
+12. **Repeating error handling logic** - Use `handleApiError()` from `app/services/api/utils.ts`
+13. **Creating API clients without types** - Define types in `app/types/api.ts`, import them
+14. **Using try-catch in API client** - Use `fetchApi()` or `fetchStream()` wrappers instead
 
 ## Priority Order for Work
 

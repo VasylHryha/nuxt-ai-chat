@@ -71,7 +71,7 @@ export default defineEventHandler(async (event) => {
               }
               else if (payload?.choices?.[0]) {
                 // Log unexpected format for debugging
-                console.debug('[OpenRouter Stream] Unexpected delta format:', { payload: JSON.stringify(payload).slice(0, 200) })
+                console.warn('[OpenRouter Stream] Unexpected delta format:', { payload: JSON.stringify(payload).slice(0, 200) })
               }
             }
             catch (err) {

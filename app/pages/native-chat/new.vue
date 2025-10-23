@@ -2,7 +2,7 @@
 import { useChatSession } from '@/composables/useChatSession'
 
 const router = useRouter()
-const { chat, currentChatId, isSending, errorMessage } = useChatSession({
+const { chat, isSending, errorMessage } = useChatSession({
   type: 'native',
   onFirstChatCreated: id => router.replace(`/native-chat/${id}`),
 })

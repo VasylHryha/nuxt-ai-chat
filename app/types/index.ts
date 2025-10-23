@@ -35,3 +35,21 @@ export interface DirectorySnapshot {
   currentProfileId: string
   profiles: Record<string, Profile>
 }
+
+export interface ChatListMessagePreview {
+  role: string
+  content: string
+  createdAt: string
+}
+
+export interface ChatListItem {
+  id: string
+  title: string
+  provider: string
+  model: string
+  ui?: 'ai-sdk' | 'native' | 'proxy'
+  createdAt: string
+  updatedAt: string
+  messageCount: number
+  lastMessage: ChatListMessagePreview | null
+}

@@ -143,13 +143,13 @@ async function handleLogout() {
     </header>
 
     <!-- Main -->
-    <main class="flex-1">
-      <div class="container-app py-6">
+    <UMain class="flex-1">
+      <UContainer class="container-app py-6">
         <div class="panel shadow-soft p-3 sm:p-4 lg:p-6 transition-[background,transform]">
           <slot />
         </div>
-      </div>
-    </main>
+      </UContainer>
+    </UMain>
 
     <!-- Footer -->
     <footer class="border-t border-white/10 bg-[color:var(--glass)] backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">

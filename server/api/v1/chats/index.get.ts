@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { getHeader, setHeader, setResponseStatus } from 'h3'
 import { listChatsByUserEmail } from '@/server/db/chats'
 import { getLastMessageByChatId, getMessageCountByChatId } from '@/server/db/messages'
 // Note: safeValidateQuery, listChatsQuerySchema are auto-imported from server/utils/
@@ -23,7 +25,7 @@ export default defineEventHandler((event) => {
     }
 
     // Get message count and last message for each chat
-    return rows.map((r) => {
+    const response = rows.map((r) => {
       const messageCount = getMessageCountByChatId(r.id)
       const lastMessage = getLastMessageByChatId(r.id)
 
@@ -45,6 +47,19 @@ export default defineEventHandler((event) => {
           : null,
       }
     })
+
+    const etagPayload = JSON.stringify(response)
+    const etag = createHash('sha1').update(etagPayload).digest('hex')
+    const ifNoneMatch = getHeader(event, 'if-none-match')
+
+    setHeader(event, 'ETag', etag)
+
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      setResponseStatus(event, 304)
+      return undefined
+    }
+
+    return response
   }
   catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to list chats'

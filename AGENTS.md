@@ -1,19 +1,104 @@
-# Repository Guidelines
+# AGENTS.md
 
-## Project Structure & Module Organization
-Nuxt 4 drives the app shell in `app/` and route views in `pages/`; share cross-page UI in `app/components/` and co-locate feature-specific components with their parent page. Server handlers for chat and proxy logic live in `server/api/`, while static assets such as icons and manifest files sit in `public/`. Keep configuration-centric code (e.g., `nuxt.config.ts`, `tsconfig.json`, `eslint.config.mjs`) at the root so infrastructure changes are easy to review.
+This document keeps every AI coding agent (Claude Code, GPT-based tools, etc.) aligned when contributing to this repository. Treat it as the shared source of truth and keep it in sync with `CLAUDE.md`. If any guidance changes in one file, mirror it here.
 
-## Build, Test, and Development Commands
-Install dependencies with `bun install` to stay in sync with `bun.lock`. Use `bun run dev` for a hot-reloading local environment, `bun run build` to generate the production bundle, and `bun run preview` to smoke-test the built output. `bun run generate` produces a prerendered static site when you need static hosting.
+## Project Overview
 
-## Coding Style & Naming Conventions
-TypeScript and `<script setup>` single-file components are the default. The shared `@antfu/eslint-config` enforces two-space indentation, single quotes, no semicolons, and sorted imports; run `bunx eslint . --fix` before opening a pull request. Prefer PascalCase for Vue components (`ChatPanel.vue`), camelCase for composables (`useChatSession.ts`), and kebab-case for file-system routes (e.g., `pages/chat-history.vue`). Tailwind utility classes should be grouped by layout → spacing → color for clarity. Use descriptive identifiers—avoid abbreviated variable or function names (`config`, not `cfg`; `user`, not `usr`) so intent stays obvious during reviews.
+Nuxt 4 AI Chat Starter with secure multi-provider integration (OpenAI, Anthropic, Google, OpenRouter), JWT auth, SQLite persistence, and Tailwind v4 styling. The client never talks directly to providers—everything flows through the Nuxt backend.
 
-## Testing Guidelines
-Leverage `@nuxt/test-utils` with Vitest to cover both components and server routes. Place specs in `tests/` mirroring the source path (`tests/pages/chat-history.spec.ts`) and name async helpers with the `waitFor...` prefix. Run the suite with `bunx nuxt test` (falls back to Vitest runner) and gate merges on the suite passing. Target at least smoke coverage for every new route or server handler; add snapshot assertions for generated prompts when practical. The Vitest harness auto-loads `.env.test` via `vitest.config.ts` and the `tests/setup/test-env.ts` bootstrap, which provisions an in-memory SQLite instance, deterministic argon2 mocks, and a stubbed `fetch`; invoke `(globalThis as any).__NUXT_RESET_DB__?.()` when you need a manual database reset mid-suite.
+## Essential Reading (before touching code)
 
-## Commit & Pull Request Guidelines
-There is no existing history, so adopt Conventional Commits (`feat: add streaming chat view`) to keep changelog automation viable. Limit commits to a focused change-set and include refactors under `refactor:` rather than `feat:`. Pull requests should describe intent, testing performed, and any environment changes; attach screenshots for UI updates and link relevant issues or discussions.
+1. `docs/AI_PLAYBOOK.md` – mandatory workflow rules, planning requirements
+2. `docs/AI_AGENT_BRIEF.md` – architecture, data flow, provider strategy
+3. `CHAT_HISTORY_FEATURE.md` – how chat history is stored and synced
+4. `docs/CHAT_HISTORY_ARCHITECTURE.md` – diagrams and deeper context
+5. `TODO.md` – current priorities
+6. `CONTRIBUTING.md` – workflow quick reference
 
-## Environment & Configuration Tips
-Runtime keys are managed through Nuxt `runtimeConfig`. Define `OPENROUTER_API_KEY`, `OPENROUTER_BASE`, `OPENROUTER_MODEL`, and `APP_TITLE` in a local `.env` (never commit secrets) and restart `bun run dev` after changing them. When adding new configuration, surface public values under `runtimeConfig.public` so they remain accessible to the client bundle while keeping sensitive tokens private.
+## Operating Rules For All Agents
+
+- Stay token-efficient: ask focused questions with full context.
+- Plan first for medium/large changes; follow the playbook approval flow.
+- Run relevant tests (`bun test`, targeted suites) before finishing.
+- Keep docs in sync (README, briefs, TODO) whenever behavior changes.
+- Security first: never expose secrets, always respect middleware-authenticated `event.context.user`.
+
+## Development Workflow
+
+```bash
+bun run dev          # local dev (avoid --bun flag)
+bun run build        # production build
+bun run preview      # preview production build
+bun run db:migrate   # apply migrations
+bun db:seed <email>  # seed user (password: "password")
+bunx eslint . --fix  # lint with shared config
+bunx tsc --noEmit    # type-check
+bun test             # run test suite (bun test auth / --coverage for filters)
+```
+
+Install dependencies with `bun install` to remain aligned with `bun.lock`.
+
+## Architecture Quick Reference
+
+- **Provider tiers**: AI SDK (`type: 'ai-sdk'`), Proxy (`type: 'proxy'`), Native (`type: 'native'`). All registered in `app/services/providers/index.ts` and consumed through `useChatSession({ type })`.
+- **Repository → Store → Component** pattern: keep I/O in repositories, orchestration in Pinia stores, and UI logic in components.
+- **Nuxt auto-imports**: do not manually import `server/utils/*`, `composables/*`, or `stores/*`. Import database modules, types, or third-party packages explicitly when needed.
+- **Auth**: `server/middleware/01.auth.ts` validates every request; `app/middleware/auth.global.ts` guards client routes. Trust `event.context.user`.
+- **Chat persistence**: localStorage primary, SQLite secondary, last-write-wins merge with periodic background sync via `chatRepository.startBackgroundSync()`.
+
+## Database & Security
+
+- Schema: `users`, `credentials`, `connections`, `chats`, `messages` (see `db/migrations/001_init.sql`).
+- SQLite handled with `bun:sqlite` helpers in `server/db`.
+- JWT: HS256, 7-day TTL in dev; issue tokens via middleware, store in httpOnly cookies.
+- Passwords: Argon2id (`@node-rs/argon2`); never leak hashes or secrets in API responses.
+
+## Coding Standards
+
+- Files: components `PascalCase.vue`; composables/stores `camelCase.ts`; API routes `lowercase.method.ts`.
+- DB fields use `snake_case`; TypeScript values use `camelCase`; types are `PascalCase`; constants `UPPER_SNAKE_CASE`.
+- Error handling: log details server-side, return friendly `createError` messages; use `fetchApi`/`fetchStream` wrappers on the client.
+- Avoid `any`; prefer `unknown` in catch blocks and provide real types.
+
+## Testing Expectations
+
+- Tests live in `tests/`, mirroring source structure.
+- Use `@nuxt/test-utils` with Vitest harness (`tests/setup/test-env.ts` handles SQLite, mocks, and `__NUXT_RESET_DB__` hook).
+- Target at least smoke coverage for every new route, provider, or server handler; add snapshots for generated prompts when practical.
+
+## Common Tasks
+
+- **New provider**: extend `app/services/providers/index.ts`, add a streaming endpoint under `server/api/v1/<provider>/chat.stream.post.ts`, configure `runtimeConfig`, and update `.env`.
+- **New API endpoint**: create `server/api/v1/<resource>/<action>.<method>.ts`, rely on `event.context.user`, return DTOs, and add tests.
+- **New API client**: define types in `app/types/api.ts`, add client in `app/services/api`, rely on `fetchApi` helpers, and import via composables.
+- **New Pinia store**: `app/stores/<name>.ts`, isolate I/O in repositories, expose state/actions via `return { ... }`.
+
+## Work Priorities & Housekeeping
+
+1. P0 – unblockers (broken builds/tests, auth failures)
+2. P1 – safety (security, data integrity)
+3. P2 – user value
+4. P3 – maintainability
+5. P4 – polish
+
+Keep `README.md`, `AI_AGENT_BRIEF`, and `TODO.md` aligned with implemented changes.
+
+## Environment & Configuration
+
+`runtimeConfig` stores secrets; expose only safe fields under `runtimeConfig.public`. Maintain `.env` with `DATABASE_URL`, `JWT_SECRET`, and provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`); never commit secrets.
+
+## Additional Resources
+
+- Nuxt 4 Docs – https://nuxt.com/docs
+- Vercel AI SDK – https://sdk.vercel.ai/docs
+- Pinia – https://pinia.vuejs.org/
+- Nuxt UI – https://ui.nuxt.com/
+- Tailwind v4 – https://tailwindcss.com/blog/tailwindcss-v4-alpha
+
+## Final Reminders
+
+- Be deliberate with tokens and prompts.
+- Medium/big work requires a written plan in the conversation before coding.
+- Run tests and linting relevant to your changes.
+- Keep docs synchronized and surface any risks early.
+- Never expose secrets; validate inputs rigorously.

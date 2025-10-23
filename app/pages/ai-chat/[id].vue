@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { generateId } from 'ai'
 import { useAiChatSession } from '@/composables/useAiChatSession'
 
 const route = useRoute()
@@ -9,8 +10,7 @@ let initialChatId = route.params.id as string
 
 // If no id in route, generate one and replace URL
 if (!initialChatId || initialChatId === 'new') {
-  const { nanoid } = await import('nanoid')
-  initialChatId = `chat__${nanoid()}`
+  initialChatId = `chat__${generateId()}`
   await router.replace(`/ai-chat/${initialChatId}`)
 }
 
@@ -37,8 +37,7 @@ function handleSubmit(e: Event) {
 }
 
 async function createNewChat() {
-  const { nanoid } = await import('nanoid')
-  router.push(`/ai-chat/chat__${nanoid()}`)
+  router.push(`/ai-chat/chat__${generateId()}`)
 }
 
 useHead({ title: 'AI Chat · Nuxt AI Chat' })

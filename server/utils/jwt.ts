@@ -6,7 +6,6 @@ type Payload = Record<string, any>
 
 export async function signJWT(payload: Payload, opts: { secret: string, expiresInSec: number, issuer?: string }): Promise<string> {
   const secret = new TextEncoder().encode(opts.secret)
-  console.log('signJWT', opts.secret, '')
   return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -22,8 +21,6 @@ export async function verifyJWT(token: string, secret: string, opts?: { issuer?:
     issuer: opts?.issuer,
     algorithms: ['HS256'],
   })
-  console.log('verifyJWT', secret, '')
-  console.log('verifyJWT', payload, '')
 
   return payload as Payload
 }

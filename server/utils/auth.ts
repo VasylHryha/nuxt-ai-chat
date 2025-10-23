@@ -16,11 +16,10 @@ export function getTokenFromRequest(event: H3Event) {
 }
 
 export function setAccessCookie(event: H3Event, token: string, maxAgeSec: number) {
-  const isDev = import.meta.dev
   setCookie(event, ACCESS_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: !isDev, // Only require HTTPS in production
+    secure: true, // Only require HTTPS in production
     path: '/',
     maxAge: maxAgeSec,
   })

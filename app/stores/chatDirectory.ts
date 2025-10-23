@@ -1,91 +1,100 @@
-import type { ChatListItem, CreateChatInput } from '@/services/chatDirectoryRepository'
-// app/stores/chatDirectory.ts
+import type { ChatListItem } from '@/types'
 import { defineStore } from 'pinia'
-import { chatDirectoryRepository as repo } from '@/services/chatDirectoryRepository'
+import { deleteChat, listChats } from '@/services/api'
+
+export interface ChatDirectoryParams {
+  email: string
+  provider?: string
+  startDate?: number
+}
+
+interface FetchOptions {
+  force?: boolean
+}
 
 export const useChatDirectory = defineStore('chatDirectory', () => {
-  // state
   const items = ref<ChatListItem[]>([])
   const isLoading = ref(false)
   const isMutating = ref(false)
   const errorMessage = ref('')
+  const etag = ref<string | null>(null)
   const lastFetchedAt = ref(0)
-  const ttlMs = ref(30_000) // 30s SWR TTL
+  const ttlMs = ref(30_000)
+  const dirty = ref(true)
+  const lastParams = ref<ChatDirectoryParams | null>(null)
 
-  // getters
   const list = computed(() => items.value)
   const isStale = computed(() => Date.now() - lastFetchedAt.value > ttlMs.value)
-  const totalMessages = computed(() => 0) // optional if you want a stat (needs extra API); keep 0 for now
-  const providersUsed = computed(() => new Set(items.value.map(i => i.provider)).size)
+  const totalMessages = computed(() => items.value.reduce((sum, chat) => sum + chat.messageCount, 0))
+  const providersUsed = computed(() => new Set(items.value.map(chat => chat.provider)).size)
 
-  // actions
-  async function ensure(force = false) {
-    if (!force && items.value.length && !isStale.value)
-      return
-    await fetchAll()
+  function paramsChanged(next: ChatDirectoryParams): boolean {
+    if (!lastParams.value)
+      return true
+
+    return (
+      lastParams.value.email !== next.email
+      || lastParams.value.provider !== next.provider
+      || lastParams.value.startDate !== next.startDate
+    )
   }
 
-  async function fetchAll() {
+  function markDirty() {
+    dirty.value = true
+  }
+
+  async function ensure(params: ChatDirectoryParams, options: FetchOptions = {}) {
+    const needsFetch = (
+      options.force
+      || dirty.value
+      || !etag.value
+      || paramsChanged(params)
+      || isStale.value
+    )
+
+    if (!needsFetch)
+      return
+
+    await fetchAll(params, { useEtag: !options.force && !dirty.value })
+  }
+
+  async function fetchAll(params: ChatDirectoryParams, options: { useEtag: boolean }) {
     isLoading.value = true
     errorMessage.value = ''
+
     try {
-      const rows = await repo.list()
-      items.value = rows
+      const { items: fetched, etag: responseEtag, fromCache } = await listChats(params, {
+        ifNoneMatch: options.useEtag ? etag.value ?? undefined : undefined,
+      })
+
+      lastParams.value = { ...params }
       lastFetchedAt.value = Date.now()
+
+      if (fromCache) {
+        dirty.value = false
+        return
+      }
+
+      items.value = fetched
+      etag.value = responseEtag ?? null
+      dirty.value = false
     }
-    catch (e: any) {
-      errorMessage.value = String(e?.statusMessage || e?.message || 'Failed to load chats')
+    catch (error: any) {
+      errorMessage.value = error?.message || 'Failed to load chats'
+      throw error
     }
     finally {
       isLoading.value = false
     }
   }
 
-  async function create(input: CreateChatInput) {
-    isMutating.value = true
-    errorMessage.value = ''
-    try {
-      const created = await repo.create(input)
-      items.value = [created, ...items.value]
-      return created
-    }
-    catch (e: any) {
-      errorMessage.value = String(e?.statusMessage || e?.message || 'Failed to create chat')
-      throw e
-    }
-    finally {
-      isMutating.value = false
-    }
-  }
-
-  async function rename(id: string, title: string) {
-    isMutating.value = true
-    errorMessage.value = ''
-    try {
-      await repo.rename(id, title)
-      const idx = items.value.findIndex(c => c.id === id)
-      if (idx >= 0)
-        items.value[idx] = { ...items.value[idx], title, updatedAt: new Date().toISOString() }
-    }
-    catch (e: any) {
-      errorMessage.value = String(e?.statusMessage || e?.message || 'Failed to rename chat')
-      throw e
-    }
-    finally {
-      isMutating.value = false
-    }
-  }
-
   async function remove(id: string) {
     isMutating.value = true
-    errorMessage.value = ''
+
     try {
-      await repo.remove(id)
-      items.value = items.value.filter(c => c.id !== id)
-    }
-    catch (e: any) {
-      errorMessage.value = String(e?.statusMessage || e?.message || 'Failed to delete chat')
-      throw e
+      await deleteChat(id)
+      items.value = items.value.filter(chat => chat.id !== id)
+      dirty.value = true
     }
     finally {
       isMutating.value = false
@@ -98,8 +107,11 @@ export const useChatDirectory = defineStore('chatDirectory', () => {
     isLoading,
     isMutating,
     errorMessage,
+    etag,
     lastFetchedAt,
     ttlMs,
+    dirty,
+    lastParams,
     // getters
     list,
     isStale,
@@ -107,9 +119,7 @@ export const useChatDirectory = defineStore('chatDirectory', () => {
     providersUsed,
     // actions
     ensure,
-    fetchAll,
-    create,
-    rename,
+    markDirty,
     remove,
   }
 })

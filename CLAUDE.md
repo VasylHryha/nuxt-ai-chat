@@ -525,6 +525,64 @@ MY_PROVIDER_API_KEY=...
 4. Export composable via `return { ... }`
 5. Access via `useStoreName()` (auto-imported)
 
+### Creating a New API Client
+
+This project uses a **centralized API client pattern** to avoid repetition and ensure consistent error handling.
+
+**Files involved:**
+- `app/types/api.ts` - Define all response types here
+- `app/services/api/utils.ts` - Shared error handler and fetch wrappers
+- `app/plugins/api.client.ts` - Global interceptor (auto-attaches auth headers)
+
+**Steps:**
+
+1. **Add types** to `app/types/api.ts`:
+```typescript
+export interface MyResourceResponse {
+  id: string
+  name: string
+}
+```
+
+2. **Create API client** at `app/services/api/my-resource.ts`:
+```typescript
+import type { MyResourceResponse } from '@/types/api'
+import { fetchApi } from './utils'
+
+const BASE_URL = '/api/v1'
+
+export async function getMyResource(id: string): Promise<MyResourceResponse> {
+  // Auth header automatically attached by plugin
+  // Errors automatically handled by fetchApi wrapper
+  return fetchApi<MyResourceResponse>(
+    `${BASE_URL}/my-resource/${id}`,
+    { method: 'GET' }
+  )
+}
+
+export async function createMyResource(data: any): Promise<MyResourceResponse> {
+  return fetchApi<MyResourceResponse>(
+    `${BASE_URL}/my-resource`,
+    { method: 'POST', body: data }
+  )
+}
+```
+
+3. **Use in composables:**
+```typescript
+import { getMyResource } from '@/services/api/my-resource'
+
+const resource = await getMyResource('123')
+```
+
+**Benefits:**
+- ✅ No manual auth headers (plugin handles globally)
+- ✅ Centralized error handling
+- ✅ Type-safe responses
+- ✅ Easy to test and extend
+
+**See also:** [docs/AI_ARCHITECTURE.md - API Client Architecture](./docs/AI_ARCHITECTURE.md#api-client-architecture)
+
 ## Environment Variables
 
 Required in `.env`:
@@ -556,6 +614,10 @@ OPENROUTER_API_KEY=sk-or-...
 7. **Using separate native/proxy composables** - Use unified `useChatSession({ type })` instead
 8. **Parsing SSE streams manually** - Use `streamFromEndpoint()` utility function
 9. **Not checking provider-specific fallback support** - Native has fallback, proxy does not; check before attempting
+10. **Manually attaching auth headers** - Plugin handles it globally, don't call `getAuthHeader()`
+11. **Repeating error handling logic** - Use `handleApiError()` from `app/services/api/utils.ts`
+12. **Creating API clients without types** - Define types in `app/types/api.ts`, import them
+13. **Using try-catch in API client** - Use `fetchApi()` or `fetchStream()` wrappers instead
 
 ## Priority Order for Work
 

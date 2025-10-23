@@ -346,6 +346,110 @@ const result = streamText({
 
 ---
 
+## API Client Architecture
+
+### Centralized API Client Pattern
+
+**Problem:** Repeating auth headers, error handling, and try-catch boilerplate in multiple API clients.
+
+**Solution:** Centralized API client layer with shared utilities and global fetch interceptor.
+
+### Files Involved
+
+**1. `/app/types/api.ts`** - Response types
+```typescript
+export interface CreateChatResponse { id: string }
+export interface GetChatResponse { chat: {...}, messages: [...] }
+export interface ApiError { statusCode: number, statusMessage: string }
+```
+
+**2. `/app/services/api/utils.ts`** - Shared utilities
+```typescript
+// Error handler (reusable across all API clients)
+export function handleApiError(error: any): never
+
+// Wrapper for $fetch requests
+export async function fetchApi<T>(url: string, options: any): Promise<T>
+
+// Wrapper for streaming requests
+export async function fetchStream(url: string, options: any): Promise<Response>
+```
+
+**3. `/app/plugins/api.client.ts`** - Global fetch interceptor
+```typescript
+// Automatically attaches Authorization header to ALL $fetch requests
+$fetch.create({
+  onRequest({ options }) {
+    const auth = useAuth()
+    if (auth.token) {
+      headers.Authorization = `Bearer ${auth.token}`
+    }
+  },
+  onResponseError({ response }) {
+    // Handle 401 - session expired
+    if (response.status === 401) {
+      auth.logout()
+      navigateTo('/auth/login')
+    }
+  }
+})
+```
+
+**4. `/app/services/api/ai-sdk.ts`** - Simplified API client
+```typescript
+// Before: manual auth headers, error handling in every function
+const response = await $fetch(url, {
+  headers: getAuthHeader(),
+  body: {...}
+})
+
+// After: clean, reusable
+const response = await fetchApi<CreateChatResponse>(url, {
+  method: 'POST',
+  body: {...}
+})
+```
+
+### Why This Architecture?
+
+✅ **No Repetition** - Auth headers attached globally, not in every function
+✅ **Centralized Error Handling** - `handleApiError` is reused across all API clients
+✅ **Type Safety** - All response types in one place (`app/types/api.ts`)
+✅ **Single Responsibility** - API client is clean, utilities are separate
+✅ **Easy to Extend** - Adding new providers just imports the utilities
+✅ **Global 401 Handling** - Plugin intercepts all auth errors automatically
+
+### Migration Checklist
+
+When adding new API clients or endpoints:
+
+- [ ] Define response types in `app/types/api.ts`
+- [ ] Use `fetchApi<T>()` for GET/POST without streaming
+- [ ] Use `fetchStream()` for SSE endpoints
+- [ ] Don't manually call `getAuthHeader()` (plugin handles it)
+- [ ] Import from `./utils` for error handling
+- [ ] Remove manual try-catch-handleError boilerplate
+
+### Example: Adding a New API Client
+
+```typescript
+// app/services/api/my-api.ts
+import type { MyResponse } from '@/types/api'
+import { fetchApi } from './utils'
+
+const BASE_URL = '/api/v1'
+
+export async function getMyData(id: string): Promise<MyResponse> {
+  // Auth header automatically attached by plugin
+  // Errors automatically handled by fetchApi wrapper
+  return fetchApi<MyResponse>(`${BASE_URL}/my-endpoint/${id}`, {
+    method: 'GET'
+  })
+}
+```
+
+---
+
 ## Common Pitfalls
 
 1. **Don't manually import auto-imported utils** - Causes conflicts
@@ -353,6 +457,8 @@ const result = streamText({
 3. **Don't expose secrets in responses** - Return clean DTOs only
 4. **Don't parse SSE manually** - AI SDK handles it
 5. **Don't save messages client-side with watch()** - Use server `onFinish`
+6. **Don't manually attach auth headers** - Plugin handles it globally
+7. **Don't repeat error handling** - Use `handleApiError()` from utils
 
 ---
 

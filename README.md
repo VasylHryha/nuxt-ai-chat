@@ -1,6 +1,8 @@
 # Nuxt AI Chat Starter
 
-A production-ready **Nuxt 4** starter template demonstrating secure AI chat integration with multiple providers, JWT authentication, and SQLite persistence. Built with modern tooling and best practices as a foundation for AI-powered applications.
+A **Nuxt 4** starter template demonstrating secure AI chat integration with multiple providers, JWT authentication, and SQLite persistence. Built with modern tooling and best practices as a foundation for AI-powered applications.
+
+> ⚠️ **Project Status:** This is a **learning and experimentation project** used to test different architectural approaches, patterns, and AI integrations. While it demonstrates working patterns and includes test coverage, it's **not production-ready** and contains experimental code. The goal is to explore what works best and eventually polish it into a production-grade solution. Use this as a learning resource, reference implementation, or starting point for your own project - not a drop-in production solution.
 
 ## What This Project Does
 
@@ -15,12 +17,15 @@ This is a **fully functional starting point** for building AI chat applications 
 
 ## Use Cases
 
-This starter is designed for:
-- **Rapid prototyping** of AI chat applications
-- **Learning** modern Nuxt patterns with AI integration
-- **Testing** different AI providers and models
-- **Production foundation** that can evolve into full applications
-- **Reference implementation** for secure authentication + AI workflows
+This project is ideal for:
+- **Learning & Experimentation** - Explore modern Nuxt 4 patterns with AI integration
+- **Testing Approaches** - Try different architectural patterns, providers, and workflows
+- **Rapid Prototyping** - Quickly spin up AI chat features to test ideas
+- **Reference Implementation** - Study working examples of auth, streaming, and persistence
+- **Starting Point** - Fork and customize as the foundation for your own project
+- **Educational Resource** - Understand how to build secure AI-powered applications
+
+**Not suitable for:** Direct production deployment without significant polish and hardening.
 
 ## Tech Stack
 
@@ -265,19 +270,35 @@ docs/
 └── AI_AGENT_BRIEF.md  # Detailed architecture documentation
 ```
 
-## Future Development
+## Current Status & Roadmap
 
-This starter is designed to evolve. Potential enhancements:
+### What's Working ✅
+- ✅ JWT authentication with secure cookies
+- ✅ Multiple AI providers (OpenAI, OpenRouter, Anthropic, Google)
+- ✅ Three integration patterns (AI SDK, Proxy, Native)
+- ✅ Chat persistence with SQLite
+- ✅ Streaming responses with AI SDK
+- ✅ Agent tools (web search, calculator, date/time)
+- ✅ Basic test coverage for core features
 
-- 🎨 **UI Components** - Chat list, user management modals, provider selector
-- 🔄 **Real-time Streaming** - SSE for AI SDK streaming in UI
-- 🧪 **Comprehensive Tests** - Full test coverage for all features
-- 🔌 **More Providers** - Mistral, Cohere, local LLMs (Ollama)
-- 🛡️ **Rate Limiting** - Request throttling per user
-- 📊 **Analytics** - Usage tracking and cost monitoring
+### Known Limitations 🚧
+- 🚧 **Experimental Code** - Contains multiple approaches being tested (some may be refactored or removed)
+- 🚧 **UI Polish** - Interface is functional but not production-grade
+- 🚧 **Error Handling** - Some edge cases may not be gracefully handled
+- 🚧 **Test Coverage** - Core features tested, but not comprehensive
+- 🚧 **Documentation** - Some areas need more detailed documentation
+- 🚧 **Performance** - Not optimized for high-traffic production use
+- 🚧 **Security Hardening** - Auth works but needs production-grade security review
+
+### Future Direction 🎯
+As this project matures, planned improvements include:
+- 🎨 **UI/UX Polish** - Production-ready interface components
+- 🧪 **Full Test Coverage** - Comprehensive test suite
+- 🛡️ **Production Hardening** - Rate limiting, security audit, error handling
+- 📊 **Monitoring** - Analytics, usage tracking, cost monitoring
+- 🔌 **More Integrations** - Additional providers, local LLMs (Ollama)
 - 🌐 **i18n** - Multi-language support
-- 🎭 **Roles & Permissions** - Admin/user role management
-- 💬 **WebSocket Chat** - Real-time collaborative features
+- 🎭 **Advanced Features** - Roles/permissions, WebSocket support
 
 ## Troubleshooting
 
